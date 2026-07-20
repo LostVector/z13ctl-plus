@@ -160,6 +160,10 @@ func (d *Daemon) dispatch(req request) response {
 		}
 		// Populate eDP-1 refresh rate from kscreen-doctor.
 		s.RefreshRate = cli.ReadRefreshRate()
+		// Populate battery detail (health, power draw, status).
+		if bat, err := cli.ReadBatteryState(); err == nil {
+			s.BatteryDetail = bat
+		}
 		return response{OK: true, State: &s}
 	default:
 		return response{OK: false, Error: "unknown command: " + req.Cmd}

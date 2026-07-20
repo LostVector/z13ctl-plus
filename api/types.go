@@ -19,8 +19,24 @@ type State struct {
 	UndervoltAvailable bool                     `json:"undervolt_available"` // true if ryzen_smu is loaded
 	CPUPower           *CPUPowerState           `json:"cpu_power,omitempty"`
 	RefreshRate        int                      `json:"refresh_rate,omitempty"` // eDP-1 refresh rate in Hz (0 = unknown)
-	Temperature        int                      `json:"temperature,omitempty"`  // APU temp, degrees Celsius
-	FanRPM             int                      `json:"fan_rpm,omitempty"`      // fan1 speed in RPM
+	BatteryDetail      *BatteryState            `json:"battery_detail,omitempty"`
+	Temperature        int                      `json:"temperature,omitempty"` // APU temp, degrees Celsius
+	FanRPM             int                      `json:"fan_rpm,omitempty"`     // fan1 speed in RPM
+}
+
+// BatteryState captures live battery telemetry from power_supply sysfs.
+// Health % is computed from energy_full / energy_full_design. Power is
+// instantaneous (positive = discharging, 0 = idle or charging at threshold).
+type BatteryState struct {
+	CapacityPct  int    `json:"capacity_pct"`  // 0–100, current charge relative to threshold
+	Status       string `json:"status"`        // "Charging" / "Discharging" / "Not charging" / "Full"
+	HealthPct    int    `json:"health_pct"`    // energy_full / energy_full_design × 100
+	PowerWatts   string `json:"power_watts"`   // instantaneous draw in watts ("12.3" or "0")
+	VoltageVolts string `json:"voltage_volts"` // terminal voltage in volts
+	ThresholdPct int    `json:"threshold_pct"` // charge_control_end_threshold (40–100)
+	Charging     bool   `json:"charging"`      // true when Status == "Charging"
+	WhCurrent    int    `json:"wh_current"`    // energy_now in Wh (last full or current)
+	WhDesign     int    `json:"wh_design"`     // energy_full_design in Wh
 }
 
 // CPUPowerState captures the live AMD P-State controls exposed by cpufreq.
