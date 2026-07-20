@@ -59,7 +59,8 @@ uninstall-service:
 install-perms-service:
 	install -Dm644 contrib/systemd/system/z13ctl-perms.service $(SYSTEMD_SYSTEM_DIR)/z13ctl-perms.service
 	systemctl daemon-reload
-	systemctl enable --now z13ctl-perms.service
+	systemctl enable z13ctl-perms.service
+	systemctl restart z13ctl-perms.service
 	@echo "Permissions service installed. Run 'systemctl status z13ctl-perms' to verify."
 
 ## uninstall-perms-service: remove the sysfs permissions service (requires sudo)
