@@ -229,6 +229,60 @@ func HighTDPFanCurve() []api.FanCurvePoint {
 	}
 }
 
+// FanPresetNames is the ordered list of named fan curve presets exposed in the UI.
+// "custom" is excluded — it represents user-edited curves.
+var fanPresetNames = []string{"silent", "balanced", "turbo"}
+
+// FanPresetNames returns the ordered list of preset names. Callers should not
+// mutate the returned slice.
+func FanPresetNames() []string {
+	return append([]string(nil), fanPresetNames...)
+}
+
+// FanCurvePreset returns the 8-point fan curve for the named preset.
+// Returns nil for unknown presets.
+func FanCurvePreset(name string) []api.FanCurvePoint {
+	switch name {
+	case "silent":
+		// Quiet: fans off until 50°C, gentle ramp, max at 90°C.
+		return []api.FanCurvePoint{
+			{Temp: 25, PWM: 0},
+			{Temp: 40, PWM: 0},
+			{Temp: 50, PWM: 13},
+			{Temp: 60, PWM: 38},
+			{Temp: 70, PWM: 76},
+			{Temp: 80, PWM: 128},
+			{Temp: 85, PWM: 178},
+			{Temp: 90, PWM: 255},
+		}
+	case "balanced":
+		// Moderate ramp through the usable range.
+		return []api.FanCurvePoint{
+			{Temp: 30, PWM: 13},
+			{Temp: 45, PWM: 25},
+			{Temp: 55, PWM: 51},
+			{Temp: 65, PWM: 89},
+			{Temp: 75, PWM: 140},
+			{Temp: 82, PWM: 191},
+			{Temp: 88, PWM: 229},
+			{Temp: 95, PWM: 255},
+		}
+	case "turbo":
+		// Aggressive: 30% baseline, max by 80°C.
+		return []api.FanCurvePoint{
+			{Temp: 30, PWM: 76},
+			{Temp: 45, PWM: 128},
+			{Temp: 55, PWM: 178},
+			{Temp: 65, PWM: 216},
+			{Temp: 75, PWM: 242},
+			{Temp: 80, PWM: 255},
+			{Temp: 85, PWM: 255},
+			{Temp: 90, PWM: 255},
+		}
+	}
+	return nil
+}
+
 // ParseFanCurve parses a fan curve string "temp:pwm,temp:pwm,..." into a
 // slice of FanCurvePoint. Requires exactly 8 points. Temps must be
 // monotonically increasing (0–120°C). PWM values must be monotonically

@@ -33,12 +33,12 @@ func SocketPath() string {
 type request struct {
 	Cmd        string   `json:"cmd"`
 	Mode       string   `json:"mode,omitempty"`
-	Color      string   `json:"color,omitempty"`   // "RRGGBB" hex
-	Color2     string   `json:"color2,omitempty"`  // "RRGGBB" hex
+	Color      string   `json:"color,omitempty"`  // "RRGGBB" hex
+	Color2     string   `json:"color2,omitempty"` // "RRGGBB" hex
 	Speed      string   `json:"speed,omitempty"`
 	Brightness int      `json:"brightness,omitempty"`
 	Set        string   `json:"set,omitempty"`
-	Device     string   `json:"device,omitempty"`  // "keyboard", "lightbar", /dev/hidrawN; empty = all
+	Device     string   `json:"device,omitempty"` // "keyboard", "lightbar", /dev/hidrawN; empty = all
 	Events     []string `json:"events,omitempty"`
 	PL1        string   `json:"pl1,omitempty"`
 	PL2        string   `json:"pl2,omitempty"`
@@ -230,6 +230,28 @@ func SendCPUBoostSet(enabled bool) (bool, error) {
 		value = "1"
 	}
 	return sendSetting("cpu-boost", value)
+}
+
+// SendRefreshRateSet switches eDP-1 to the requested refresh rate (60 or 180).
+func SendRefreshRateSet(hz int) (bool, error) {
+	return sendSetting("refresh-rate", strconv.Itoa(hz))
+}
+
+// SendRefreshRateGet queries the daemon for the current eDP-1 refresh rate.
+// Returns (false, 0, nil) if the daemon is not running.
+func SendRefreshRateGet() (handled bool, hz int, err error) {
+	var resp *response
+	handled, resp, err = sendCommand(request{Cmd: "refresh-rate-get"})
+	if !handled || err != nil {
+		return handled, 0, err
+	}
+	if !resp.OK {
+		return true, 0, fmt.Errorf("%s", resp.Error)
+	}
+	if _, scanErr := fmt.Sscan(resp.Value, &hz); scanErr != nil {
+		return true, 0, fmt.Errorf("invalid refresh rate value %q: %w", resp.Value, scanErr)
+	}
+	return true, hz, nil
 }
 
 func sendSetting(command, value string) (bool, error) {

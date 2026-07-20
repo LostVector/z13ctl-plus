@@ -1,0 +1,12 @@
+# Auto-switch power profile on AC plug/unplug.
+#
+# Drops to "quiet" (Silent) on battery, raises to "performance" (Turbo) on AC.
+# Calls z13ctl to apply the profile, which writes platform_profile sysfs and
+# lets the firmware manage TDP and fan curves for that profile.
+#
+# Install: sudo cp 99-z13-power.rules /usr/lib/udev/rules.d/
+#          sudo udevadm control --reload && sudo udevadm trigger
+# Remove the file to disable.
+
+SUBSYSTEM=="power_supply", ATTR{online}=="1", RUN+="/usr/bin/env z13ctl profile performance"
+SUBSYSTEM=="power_supply", ATTR{online}=="0", RUN+="/usr/bin/env z13ctl profile quiet"

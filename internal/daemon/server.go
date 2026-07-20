@@ -28,12 +28,12 @@ import (
 type request struct {
 	Cmd        string   `json:"cmd"`
 	Mode       string   `json:"mode,omitempty"`
-	Color      string   `json:"color,omitempty"`   // "RRGGBB" hex
-	Color2     string   `json:"color2,omitempty"`  // "RRGGBB" hex
+	Color      string   `json:"color,omitempty"`  // "RRGGBB" hex
+	Color2     string   `json:"color2,omitempty"` // "RRGGBB" hex
 	Speed      string   `json:"speed,omitempty"`
 	Brightness int      `json:"brightness,omitempty"`
 	Set        string   `json:"set,omitempty"`
-	Device     string   `json:"device,omitempty"`  // "keyboard", "lightbar", /dev/hidrawN; empty = all
+	Device     string   `json:"device,omitempty"` // "keyboard", "lightbar", /dev/hidrawN; empty = all
 	Events     []string `json:"events,omitempty"`
 	PL1        string   `json:"pl1,omitempty"`
 	PL2        string   `json:"pl2,omitempty"`
@@ -43,11 +43,11 @@ type request struct {
 
 // response is the reply to a command or a streamed event notification.
 type response struct {
-	OK    bool   `json:"ok"`
-	Error string `json:"error,omitempty"`
-	Value string `json:"value,omitempty"`
+	OK    bool       `json:"ok"`
+	Error string     `json:"error,omitempty"`
+	Value string     `json:"value,omitempty"`
 	State *api.State `json:"state,omitempty"`
-	Event string `json:"event,omitempty"`
+	Event string     `json:"event,omitempty"`
 }
 
 // handleConn reads one JSON request, dispatches it, and writes one JSON response.
@@ -111,6 +111,10 @@ func (d *Daemon) dispatch(req request) response {
 		return handleCPUEPP(req)
 	case "cpu-boost":
 		return handleCPUBoost(req)
+	case "refresh-rate":
+		return handleRefreshRate(req)
+	case "refresh-rate-get":
+		return handleRefreshRateGet()
 	case "fancurve":
 		return d.handleFanCurve(req)
 	case "fancurve-get":
@@ -154,6 +158,8 @@ func (d *Daemon) dispatch(req request) response {
 		if rpms, err := cli.ReadBothFanRPM(); err == nil {
 			s.FanRPM = rpms[0]
 		}
+		// Populate eDP-1 refresh rate from kscreen-doctor.
+		s.RefreshRate = cli.ReadRefreshRate()
 		return response{OK: true, State: &s}
 	default:
 		return response{OK: false, Error: "unknown command: " + req.Cmd}
@@ -186,6 +192,26 @@ func handleCPUBoost(req request) response {
 	if err := cli.SetCPUBoost(value == 1); err != nil {
 		return response{OK: false, Error: err.Error()}
 	}
+	return response{OK: true}
+}
+
+// handleRefreshRateGet reads the current eDP-1 refresh rate via kscreen-doctor.
+// Returns the integer Hz value (60 or 180) or 0 if unavailable.
+func handleRefreshRateGet() response {
+	hz := cli.ReadRefreshRate()
+	return response{OK: true, Value: strconv.Itoa(hz)}
+}
+
+// handleRefreshRate switches eDP-1 to the requested refresh rate.
+func handleRefreshRate(req request) response {
+	hz, err := strconv.Atoi(req.Set)
+	if err != nil {
+		return response{OK: false, Error: "refresh rate must be an integer in Hz"}
+	}
+	if err := cli.SetRefreshRate(hz); err != nil {
+		return response{OK: false, Error: err.Error()}
+	}
+	slog.Info("refresh-rate", "hz", hz)
 	return response{OK: true}
 }
 

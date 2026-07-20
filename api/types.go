@@ -18,6 +18,7 @@ type State struct {
 	Undervolt          *UndervoltState          `json:"undervolt,omitempty"`
 	UndervoltAvailable bool                     `json:"undervolt_available"` // true if ryzen_smu is loaded
 	CPUPower           *CPUPowerState           `json:"cpu_power,omitempty"`
+	RefreshRate        int                      `json:"refresh_rate,omitempty"` // eDP-1 refresh rate in Hz (0 = unknown)
 	Temperature        int                      `json:"temperature,omitempty"`  // APU temp, degrees Celsius
 	FanRPM             int                      `json:"fan_rpm,omitempty"`      // fan1 speed in RPM
 }
