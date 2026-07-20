@@ -16,6 +16,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strconv"
 	"time"
 )
 
@@ -203,6 +204,36 @@ func SendBootSoundSet(value int) (bool, error) {
 // SendPanelOverdriveSet sends a panel overdrive set command to the daemon.
 func SendPanelOverdriveSet(value int) (bool, error) {
 	handled, resp, err := sendCommand(request{Cmd: "paneloverdrive", Set: fmt.Sprintf("%d", value)})
+	if !handled || err != nil {
+		return handled, err
+	}
+	if !resp.OK {
+		return true, fmt.Errorf("%s", resp.Error)
+	}
+	return true, nil
+}
+
+// SendCPUMinFrequencySet sets the minimum CPU frequency for every cpufreq policy.
+func SendCPUMinFrequencySet(khz int) (bool, error) {
+	return sendSetting("cpu-min", strconv.Itoa(khz))
+}
+
+// SendCPUEPPSet sets the AMD energy performance preference for every CPU policy.
+func SendCPUEPPSet(value string) (bool, error) {
+	return sendSetting("cpu-epp", value)
+}
+
+// SendCPUBoostSet enables or disables CPU boost.
+func SendCPUBoostSet(enabled bool) (bool, error) {
+	value := "0"
+	if enabled {
+		value = "1"
+	}
+	return sendSetting("cpu-boost", value)
+}
+
+func sendSetting(command, value string) (bool, error) {
+	handled, resp, err := sendCommand(request{Cmd: command, Set: value})
 	if !handled || err != nil {
 		return handled, err
 	}

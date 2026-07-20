@@ -82,6 +82,11 @@ handled, err          := api.SendProfileSet("performance")
 handled, err := api.SendBootSoundSet(0)
 handled, err := api.SendPanelOverdriveSet(1)
 
+// Live AMD P-State controls
+handled, err := api.SendCPUMinFrequencySet(625000) // kHz
+handled, err := api.SendCPUEPPSet("balance_power")
+handled, err := api.SendCPUBoostSet(false)
+
 // Fan curves (applied to both fans simultaneously)
 handled, value, err := api.SendFanCurveGet()
 handled, err         := api.SendFanCurveSet("48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102")
@@ -110,6 +115,7 @@ if handled && err == nil {
     fmt.Println("tdp:", state.TDP)
     fmt.Println("undervolt:", state.Undervolt)
     fmt.Println("undervolt available:", state.UndervoltAvailable)
+    fmt.Println("CPU power:", state.CPUPower)
     fmt.Println("APU temp:", state.Temperature, "°C")
     fmt.Println("fan RPM:", state.FanRPM)
 }

@@ -17,8 +17,19 @@ type State struct {
 	TDP                *TDPState                `json:"tdp,omitempty"`
 	Undervolt          *UndervoltState          `json:"undervolt,omitempty"`
 	UndervoltAvailable bool                     `json:"undervolt_available"` // true if ryzen_smu is loaded
+	CPUPower           *CPUPowerState           `json:"cpu_power,omitempty"`
 	Temperature        int                      `json:"temperature,omitempty"`  // APU temp, degrees Celsius
 	FanRPM             int                      `json:"fan_rpm,omitempty"`      // fan1 speed in RPM
+}
+
+// CPUPowerState captures the live AMD P-State controls exposed by cpufreq.
+type CPUPowerState struct {
+	MinFrequencyKHz int      `json:"min_frequency_khz"`
+	MinLimitKHz     int      `json:"min_limit_khz"`
+	MaxLimitKHz     int      `json:"max_limit_khz"`
+	EPP             string   `json:"epp"`
+	EPPChoices      []string `json:"epp_choices"`
+	Boost           bool     `json:"boost"`
 }
 
 // LightingState captures all parameters needed to reproduce one lighting zone.

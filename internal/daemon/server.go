@@ -105,6 +105,12 @@ func (d *Daemon) dispatch(req request) response {
 		return d.handlePanelOverdrive(req)
 	case "paneloverdrive-get":
 		return handlePanelOverdriveGet()
+	case "cpu-min":
+		return handleCPUMin(req)
+	case "cpu-epp":
+		return handleCPUEPP(req)
+	case "cpu-boost":
+		return handleCPUBoost(req)
 	case "fancurve":
 		return d.handleFanCurve(req)
 	case "fancurve-get":
@@ -130,6 +136,9 @@ func (d *Daemon) dispatch(req request) response {
 		// Populate firmware-managed fields from sysfs (not cached in daemon state).
 		s.BootSound = readIntSysfs(cli.FindBootSoundPath())
 		s.PanelOverdrive = readIntSysfs(cli.FindPanelOverdrivePath())
+		if cpuPower, err := cli.ReadCPUPower(); err == nil {
+			s.CPUPower = &cpuPower
+		}
 		// Populate fan curve from sysfs for ground truth.
 		s.FanCurve = readFanCurveFromSysfs()
 		// Populate TDP, substituting per-profile defaults if sysfs is stale.
@@ -149,6 +158,35 @@ func (d *Daemon) dispatch(req request) response {
 	default:
 		return response{OK: false, Error: "unknown command: " + req.Cmd}
 	}
+}
+
+func handleCPUMin(req request) response {
+	khz, err := strconv.Atoi(req.Set)
+	if err != nil {
+		return response{OK: false, Error: "CPU minimum frequency must be an integer in kHz"}
+	}
+	if err := cli.SetCPUMinFrequency(khz); err != nil {
+		return response{OK: false, Error: err.Error()}
+	}
+	return response{OK: true}
+}
+
+func handleCPUEPP(req request) response {
+	if err := cli.SetCPUEPP(req.Set); err != nil {
+		return response{OK: false, Error: err.Error()}
+	}
+	return response{OK: true}
+}
+
+func handleCPUBoost(req request) response {
+	value, err := strconv.Atoi(req.Set)
+	if err != nil || (value != 0 && value != 1) {
+		return response{OK: false, Error: "CPU boost must be 0 or 1"}
+	}
+	if err := cli.SetCPUBoost(value == 1); err != nil {
+		return response{OK: false, Error: err.Error()}
+	}
+	return response{OK: true}
 }
 
 // handleProfileGet reads the current performance profile from sysfs.
@@ -581,7 +619,11 @@ func readProfileFromSysfs() string {
 }
 
 func (d *Daemon) handleTDP(req request) response {
-	watts, err := strconv.Atoi(req.Set)
+	base := req.Set
+	if base == "" {
+		base = req.PL1
+	}
+	watts, err := strconv.Atoi(base)
 	if err != nil {
 		return response{OK: false, Error: "TDP value must be an integer"}
 	}
@@ -766,4 +808,3 @@ func writeResponse(conn net.Conn, r response) {
 	data, _ := json.Marshal(r)
 	_, _ = fmt.Fprintf(conn, "%s\n", data)
 }
-

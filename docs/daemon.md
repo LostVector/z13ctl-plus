@@ -128,7 +128,8 @@ The file is written atomically after every successful command. It stores:
   clients can distinguish active vs saved values)
 
 On `get-state` requests the daemon also populates `temperature` (APU die
-temperature in °C), `fan_rpm` (fan speed in RPM), and `undervolt_available`
+temperature in °C), `fan_rpm` (fan speed in RPM), `cpu_power` (live cpufreq
+minimum, EPP, boost, and available limits), and `undervolt_available`
 (whether the `ryzen_smu` kernel module is present) from live sysfs reads.
 These are not persisted — they are real-time sensor values.
 
