@@ -191,6 +191,19 @@ contrib/
   `undervolt_available` (using `SMUProbeUndervolt()`, not just `SMUAvailable()`)
   so GUIs can hide controls when ryzen_smu is not installed or the wrong fork
   is present.
+- **NPU telemetry (amdxdna DRM ioctl)**: `internal/cli/npu.go` reads power (W)
+  and per-column utilization (%) via `DRM_AMDXDNA_QUERY_SENSORS`, plus the
+  MP-NPU clock via `DRM_AMDXDNA_QUERY_CLOCK_METADATA`. These are
+  hardware-backed sensors (not derived submission-counter deltas), exposed by
+  the `amdxdna` driver (mainline since Linux 6.19; `amdxdna-dkms` 7.0+ on
+  older kernels). Unlike the amdgpu/iGPU readers which use sysfs, the NPU
+  readers issue ioctls on `/dev/accel/accelN` (discovered via
+  `/sys/class/accel/accel*/device/vendor == 0x1022`). Multiple column sensors
+  are averaged to one busy %. No `xrt-smi` or `xdna-top` dependency — pure
+  Go, one new file. Added to `api.TelemetryState` and surfaced on the
+  `status` command and in the daemon's `get-state` response. Column
+  utilization and power sensors are gated by driver version; older `amdxdna`
+  stacks may return power only.
 - **Sleep/resume hook**: `internal/daemon/resume.go` watches for DBus
   `org.freedesktop.login1.Manager.PrepareForSleep` signals. On sleep
   (`PrepareForSleep(true)`), turns off the lightbar via `aura.TurnOff()` (the
