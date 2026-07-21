@@ -36,10 +36,11 @@ Values (accepts name or number, case-insensitive):
 The uAPI also defines LOW (1) and MEDIUM (2), but the amdxdna driver
 returns EOPNOTSUPP for them — they are not exposed by this command.
 
-Empirically (Qwen3-0.6B sustained generation): all three modes draw
-within 20mW of each other (~2.15W). TURBO provides no measurable benefit
-for sustained workloads — clk_gating has nothing to gate when the NPU
-is continuously busy. DEFAULT is the right choice for normal use.
+Empirically (Qwen3-0.6B, sustained + bursty workloads): all three modes
+draw within 20mW of each other (~2.15W sustained; ~0.42W idle trough). The
+driver pins DPM at max whenever any process holds the device open, so the
+power_mode setting has no measurable effect — only whether the device file
+is open matters. DEFAULT is the right choice.
 
 Note: SET_STATE is DRM_ROOT_ONLY in the amdxdna driver, so --set requires
 root (use sudo, or setcap cap_sys_admin+ep on the binary). --get is

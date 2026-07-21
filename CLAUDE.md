@@ -233,9 +233,16 @@ contrib/
   default=2.14W, high=2.16W, turbo=2.16W — within 20mW of each other, well
   below sensor noise. TURBO's clk_gating-off setting provides no measurable
   benefit for sustained workloads because there are no idle blocks to gate
-  when the NPU is continuously busy. DEFAULT is the right choice for normal
-  use; TURBO's only real value is for short bursty workloads with idle gaps
-  where clk_gating wake-up latency could matter (not measured here).
+  when the NPU is continuously busy.
+  **Bursty load test (40-token generations every 6s, 5s idle gaps)**: all
+  three modes show identical decay curves, troughing at 0.42-0.43W between
+  bursts — 10mW spread, indistinguishable. The 0.42W floor (vs 0.00W when
+  the device is fully released) is the device-open leakage at the pinned
+  max DPM level; `power_mode` cannot reduce it. **Conclusion: across both
+  sustained and bursty workloads, DEFAULT/HIGH/TURBO are functionally
+  equivalent in measured power. The only knob that moves NPU power is
+  whether the device file is held open by any process** — which the
+  `power_mode` interface does not affect. DEFAULT is the right choice.
 - **Sleep/resume hook**: `internal/daemon/resume.go` watches for DBus
   `org.freedesktop.login1.Manager.PrepareForSleep` signals. On sleep
   (`PrepareForSleep(true)`), turns off the lightbar via `aura.TurnOff()` (the
