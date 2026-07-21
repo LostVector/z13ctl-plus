@@ -211,7 +211,7 @@ contrib/
   open — but it is not metadata. Older `amdxdna` versions (pre-7.0) may not
   update `npuclk_freq` and would report a fixed value.
 - **NPU power mode (`z13ctl npu --set turbo`)**: the same `internal/cli/npu.go`
-  also gets/sets the NPU DPM power mode (DEFAULT/LOW/MEDIUM/HIGH/TURBO) via
+  also gets/sets the NPU DPM power mode (DEFAULT/HIGH/TURBO) via
   `DRM_AMDXDNA_GET_POWER_MODE` (param 9) and `DRM_AMDXDNA_SET_STATE` with
   `DRM_AMDXDNA_SET_POWER_MODE`. The mode is volatile — it resets on sleep and
   the daemon does not persist it. **Important**: the driver marks SET_STATE
@@ -220,6 +220,15 @@ contrib/
   the binary). udev rules cannot grant this — it is enforced inside DRM core,
   not via file permissions. `--get` is unprivileged. Daemon handler also
   requires the daemon itself to run as root to actually mutate the mode.
+  **Only 3 of 5 uAPI modes work**: `aie2_pm_set_mode` (`aie2_pm.c:82-126`)
+  only implements DEFAULT (which equals max DPM on NPU5 because
+  `dft_dpm_level == max_dpm_level`), HIGH (max DPM, clk_gating on), and
+  TURBO (max DPM, clk_gating off, refused if any hwctx is active). LOW and
+  MEDIUM fall through to the `default:` case and return `-EOPNOTSUPP`, so
+  z13ctl rejects them in `NPUPowerModeFromString` before calling the ioctl.
+  Net effect on Strix Halo: all three working modes run at the same npuclk
+  (1267 MHz) — the DPM table has 8 levels (396-1267 MHz) but the power_mode
+  interface doesn't expose them.
 - **Sleep/resume hook**: `internal/daemon/resume.go` watches for DBus
   `org.freedesktop.login1.Manager.PrepareForSleep` signals. On sleep
   (`PrepareForSleep(true)`), turns off the lightbar via `aura.TurnOff()` (the

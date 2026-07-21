@@ -18,7 +18,6 @@ import (
 	"fmt"
 	"os"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -248,14 +247,19 @@ func ReadNPUPowerMode() (int, error) {
 	return int(pm.mode), nil
 }
 
-// SetNPUPowerMode sets the NPU DPM power mode (0–4). The mode is volatile —
-// it resets to DEFAULT on sleep/shutdown; the daemon does not persist it.
+// SetNPUPowerMode sets the NPU DPM power mode. The mode is volatile — it
+// resets to DEFAULT on sleep/shutdown; the daemon does not persist it.
 //
 // NOTE: the amdxdna driver marks SET_STATE as DRM_ROOT_ONLY, so this returns
 // EACCES unless the caller has CAP_SYS_ADMIN (root or setcap'd binary).
+// Also, only DEFAULT (0), HIGH (3), and TURBO (4) are implemented by the
+// driver — LOW (1) and MEDIUM (2) return EOPNOTSUPP (see aie2_pm.c:111).
 func SetNPUPowerMode(mode int) error {
-	if mode < NPUPowerModeDefault || mode > NPUPowerModeTurbo {
-		return fmt.Errorf("npu power mode %d out of range [0, 4]", mode)
+	switch mode {
+	case NPUPowerModeDefault, NPUPowerModeHigh, NPUPowerModeTurbo:
+		// ok
+	default:
+		return fmt.Errorf("power mode %d not supported by amdxdna driver (only DEFAULT, HIGH, TURBO)", mode)
 	}
 	path := findNPUDevice()
 	if path == "" {
@@ -304,25 +308,20 @@ func NPUPowerModeName(mode int) string {
 }
 
 // NPUPowerModeFromString parses a power mode by name or numeric string.
-// Returns (mode, true) on success, (0, false) if the input is unrecognized.
-// Matching is case-insensitive; names match NPUPowerModeName output.
+// Returns (mode, true) on success, (0, false) if the input is unrecognized
+// or unsupported.
+//
+// Only DEFAULT (0), HIGH (3), and TURBO (4) are exposed. The uAPI defines
+// LOW (1) and MEDIUM (2) but the amdxdna driver returns -EOPNOTSUPP for
+// them (aie2_pm.c:111 default case), so we reject them here rather than
+// surface a confusing kernel error. Matching is case-insensitive.
 func NPUPowerModeFromString(s string) (int, bool) {
-	if n, err := strconv.Atoi(s); err == nil {
-		if n >= NPUPowerModeDefault && n <= NPUPowerModeTurbo {
-			return n, true
-		}
-		return 0, false
-	}
 	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "default", "def":
+	case "default", "def", "0":
 		return NPUPowerModeDefault, true
-	case "low":
-		return NPUPowerModeLow, true
-	case "medium", "med":
-		return NPUPowerModeMedium, true
-	case "high":
+	case "high", "3":
 		return NPUPowerModeHigh, true
-	case "turbo":
+	case "turbo", "4":
 		return NPUPowerModeTurbo, true
 	default:
 		return 0, false

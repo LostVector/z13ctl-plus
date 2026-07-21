@@ -558,8 +558,8 @@ func handleNPUPowerModeGet() response {
 
 func (d *Daemon) handleNPUPowerMode(req request) response {
 	value, err := strconv.Atoi(req.Set)
-	if err != nil || value < 0 || value > 4 {
-		return response{OK: false, Error: "npu power mode must be 0-4 (default/low/medium/high/turbo)"}
+	if err != nil || !(value == 0 || value == 3 || value == 4) {
+		return response{OK: false, Error: "npu power mode must be 0 (default), 3 (high), or 4 (turbo); LOW and MEDIUM are not implemented by the amdxdna driver"}
 	}
 	if err := cli.SetNPUPowerMode(value); err != nil {
 		return response{OK: false, Error: "npu power mode: " + err.Error()}
