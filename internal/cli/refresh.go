@@ -35,6 +35,14 @@ const (
 // 180 = full speed). Order defines UI order.
 var supportedRefreshRates = []int{60, 180}
 
+// InternalDisplayState is the current KScreen state for the built-in panel.
+type InternalDisplayState struct {
+	Enabled  bool
+	Refresh  int
+	Scale    float64
+	Rotation string
+}
+
 // SupportedRefreshRates returns the refresh rates selectable in the UI.
 func SupportedRefreshRates() []int {
 	return append([]int(nil), supportedRefreshRates...)
@@ -43,18 +51,40 @@ func SupportedRefreshRates() []int {
 // ReadRefreshRate returns the current eDP-1 refresh rate in Hz (integer).
 // Returns 0 if kscreen-doctor is missing or eDP-1 is not connected.
 func ReadRefreshRate() int {
+	state, err := ReadInternalDisplay()
+	if err != nil || !state.Enabled {
+		return 0
+	}
+	return state.Refresh
+}
+
+// ReadInternalDisplay returns the enabled, mode, scale, and rotation state of eDP-1.
+func ReadInternalDisplay() (InternalDisplayState, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, kscreenBin, "-o").CombinedOutput()
 	if err != nil {
-		return 0
+		return InternalDisplayState{}, err
 	}
-	return parseCurrentRefresh(out)
+	state, ok := parseInternalDisplay(out)
+	if !ok {
+		return InternalDisplayState{}, fmt.Errorf("%s output not found", outputName)
+	}
+	return state, nil
 }
 
 // parseCurrentRefresh finds the eDP-1 line marked with "*" (current mode)
 // and extracts the integer refresh rate.
 func parseCurrentRefresh(out []byte) int {
+	state, ok := parseInternalDisplay(out)
+	if !ok {
+		return 0
+	}
+	return state.Refresh
+}
+
+func parseInternalDisplay(out []byte) (InternalDisplayState, bool) {
+	out = regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAll(out, nil)
 	// kscreen-doctor marks the active mode with a trailing "*". Example:
 	//   Modes:  1:2560x1600@180.00*  2:2560x1600@60.00  ...
 	// We look for "@<digits>.<digits>*" inside a Modes: block.
@@ -63,39 +93,74 @@ func parseCurrentRefresh(out []byte) int {
 	re := regexp.MustCompile(`(?m)^Output:.*\b` + outputName + `\b.*\n(?s:.*?)(?:^Output:|\z)`)
 	block := re.Find(out)
 	if block == nil {
-		block = out // single-output fallback
+		return InternalDisplayState{}, false
 	}
+	state := InternalDisplayState{Enabled: regexp.MustCompile(`(?m)^\s*enabled\s*$`).Match(block)}
 	rateRe := regexp.MustCompile(`@(\d+)\.\d+\*`)
 	m := rateRe.FindSubmatch(block)
-	if m == nil {
-		return 0
+	if m != nil {
+		state.Refresh, _ = strconv.Atoi(string(m[1]))
 	}
-	n, err := strconv.Atoi(string(m[1]))
-	if err != nil {
-		return 0
+	if m := regexp.MustCompile(`(?m)^\s*Scale:\s*([0-9.]+)\s*$`).FindSubmatch(block); m != nil {
+		state.Scale, _ = strconv.ParseFloat(string(m[1]), 64)
 	}
-	return n
+	if m := regexp.MustCompile(`(?m)^\s*Rotation:\s*(\d+)\s*$`).FindSubmatch(block); m != nil {
+		state.Rotation = rotationName(string(m[1]))
+	}
+	return state, true
 }
 
-// SetRefreshRate switches eDP-1 to the requested rate (must be in
-// supportedRefreshRates). No-op if the requested rate is already current.
-func SetRefreshRate(hz int) error {
-	if !isSupportedRate(hz) {
-		return fmt.Errorf("unsupported refresh rate %d (valid: %v)", hz, supportedRefreshRates)
+// ApplyInternalDisplay changes only the non-zero internal-panel properties in
+// one KScreen transaction. External outputs are never included.
+func ApplyInternalDisplay(scale float64, rotation string, hz int) error {
+	args := make([]string, 0, 3)
+	if scale != 0 {
+		if scale < 1 || scale > 3 {
+			return fmt.Errorf("unsupported display scale %g", scale)
+		}
+		args = append(args, fmt.Sprintf("output.%s.scale.%g", outputName, scale))
 	}
-	if ReadRefreshRate() == hz {
+	if rotation != "" {
+		switch rotation {
+		case "none", "left", "right", "inverted":
+		default:
+			return fmt.Errorf("unsupported display rotation %q", rotation)
+		}
+		args = append(args, "output."+outputName+".rotation."+rotation)
+	}
+	if hz != 0 {
+		if !isSupportedRate(hz) {
+			return fmt.Errorf("unsupported refresh rate %d (valid: %v)", hz, supportedRefreshRates)
+		}
+		args = append(args, "output."+outputName+".mode."+fmt.Sprintf("%s@%d", nativeMode, hz))
+	}
+	if len(args) == 0 {
 		return nil
 	}
-	arg := "output." + outputName + ".mode." + fmt.Sprintf("%s@%d", nativeMode, hz)
 	ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, kscreenBin, arg)
+	cmd := exec.CommandContext(ctx, kscreenBin, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("kscreen-doctor %s: %w%s", arg, err, suffixNonEmpty(stderr.String()))
+		return fmt.Errorf("kscreen-doctor %s: %w%s", strings.Join(args, " "), err, suffixNonEmpty(stderr.String()))
 	}
 	return nil
+}
+
+func rotationName(value string) string {
+	switch value {
+	case "1":
+		return "none"
+	case "2":
+		return "left"
+	case "4":
+		return "inverted"
+	case "8":
+		return "right"
+	default:
+		return ""
+	}
 }
 
 func isSupportedRate(hz int) bool {

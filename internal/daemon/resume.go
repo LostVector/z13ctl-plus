@@ -78,6 +78,14 @@ func (d *Daemon) restoreVolatileState() {
 	d.mu.Lock()
 	state := d.state
 	d.mu.Unlock()
+	defer d.requestDisplayReconcile()
+
+	if state.ActivePreset == "" {
+		d.applyMu.Lock()
+		defer d.applyMu.Unlock()
+	} else {
+		d.applyMu.Lock()
+	}
 
 	// Restore lighting (lost on sleep regardless of profile).
 	if d.dev != nil {
@@ -86,6 +94,16 @@ func (d *Daemon) restoreVolatileState() {
 		} else {
 			slog.Info("resume: lighting restored")
 		}
+	}
+
+	if state.ActivePreset != "" {
+		d.applyMu.Unlock()
+		if err := d.applyPreset(state.ActivePreset); err != nil {
+			slog.Warn("resume: failed to restore active preset", "preset", state.ActivePreset, "err", err)
+		} else {
+			slog.Info("resume: active preset restored", "preset", state.ActivePreset)
+		}
+		return
 	}
 
 	if state.Profile != "custom" {

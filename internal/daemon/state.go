@@ -9,9 +9,12 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"sync"
 
 	"github.com/dahui/z13ctl/api"
 )
+
+var stateSaveMu sync.Mutex
 
 func defaultState() api.State {
 	return api.State{
@@ -52,6 +55,8 @@ func loadState() api.State {
 
 // saveState atomically writes state to disk.
 func saveState(s api.State) error {
+	stateSaveMu.Lock()
+	defer stateSaveMu.Unlock()
 	path := statePath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err

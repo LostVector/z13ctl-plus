@@ -16,21 +16,26 @@ type State struct {
 	FanCurve           *FanCurveState           `json:"fan_curve,omitempty"`
 	TDP                *TDPState                `json:"tdp,omitempty"`
 	Undervolt          *UndervoltState          `json:"undervolt,omitempty"`
-	UndervoltAvailable bool                     `json:"undervolt_available"` // true if ryzen_smu is loaded
+	Presets            map[string]Preset        `json:"presets,omitempty"`
+	PowerPolicy        *PowerPolicy             `json:"power_policy,omitempty"`
+	ActivePreset       string                   `json:"active_preset,omitempty"`
+	PowerSource        string                   `json:"power_source,omitempty"` // live: "ac", "battery", or ""
+	UndervoltAvailable bool                     `json:"undervolt_available"`    // true if ryzen_smu is loaded
 	CPUPower           *CPUPowerState           `json:"cpu_power,omitempty"`
 	RefreshRate        int                      `json:"refresh_rate,omitempty"` // eDP-1 refresh rate in Hz (0 = unknown)
 	BatteryDetail      *BatteryState            `json:"battery_detail,omitempty"`
-	Temperature        int `json:"temperature,omitempty"` // APU temp, degrees Celsius (legacy; also in Telemetry)
-	FanRPM             int `json:"fan_rpm,omitempty"`     // fan1 speed in RPM (legacy; also in Telemetry)
-	Telemetry          *TelemetryState `json:"telemetry,omitempty"` // live sensor readings
+	Temperature        int                      `json:"temperature,omitempty"` // APU temp, degrees Celsius (legacy; also in Telemetry)
+	FanRPM             int                      `json:"fan_rpm,omitempty"`     // fan1 speed in RPM (legacy; also in Telemetry)
+	Telemetry          *TelemetryState          `json:"telemetry,omitempty"`   // live sensor readings
 }
 
 // TelemetryState captures live sensor readings from the AMD Strix Halo SoC.
 // CPU values come from k10temp + cpufreq + /proc/stat. GPU values come from
 // the amdgpu driver sysfs (hwmon + drm device). NPU values come from the
 // amdxdna DRM accel driver via ioctl (power, column utilization, clock).
-// VRAM reflects the iGPU carveout in unified memory. All values are sampled
-// at read time; the daemon does not average or smooth them.
+// VRAM reflects the iGPU carveout in unified memory. Memory reflects Linux
+// system memory, with used computed as MemTotal - MemAvailable. All values are
+// sampled at read time; the daemon does not average or smooth them.
 //
 // CPUUtil is computed as the delta of /proc/stat jiffies between successive
 // calls, so the first call after daemon start may report 0. Subsequent calls
@@ -40,20 +45,22 @@ type State struct {
 // unavailable, not as -1, so callers can do simple presence checks via the
 // parent State.Telemetry == nil.
 type TelemetryState struct {
-	CPUTemp     int `json:"cpu_temp,omitempty"`      // APU die temp, °C (k10temp Tctl)
-	GPUTemp     int `json:"gpu_temp,omitempty"`      // iGPU edge temp, °C (amdgpu temp1)
-	CPUFanRPM   int `json:"cpu_fan_rpm,omitempty"`   // fan1_input (CPU-side heatsink)
-	GPUFanRPM   int `json:"gpu_fan_rpm,omitempty"`   // fan2_input (GPU-side heatsink)
-	CPUUtil     int `json:"cpu_util,omitempty"`      // 0–100, /proc/stat jiffie delta
-	GPUUtil     int `json:"gpu_util,omitempty"`      // 0–100, amdgpu gpu_busy_percent
-	NPUUtil     int     `json:"npu_util,omitempty"`      // 0–100, amdxdna column utilization (avg)
-	NPUPowerW   float64 `json:"npu_power_w,omitempty"`   // amdxdna NPU power draw, W (decimal, e.g. 1.85)
-	NPUClockMHz int     `json:"npu_clock_mhz,omitempty"` // amdxdna live npuclk from current DPM level
-	CPUClockMHz int `json:"cpu_clock_mhz,omitempty"` // average scaling_cur_freq across cores
-	GPUClockMHz int `json:"gpu_clock_mhz,omitempty"` // amdgpu freq1_input (sclk) or pp_dpm_sclk active
-	VRAMUsedMB  int `json:"vram_used_mb,omitempty"`  // amdgpu mem_info_vram_used
-	VRAMTotalMB int `json:"vram_total_mb,omitempty"` // amdgpu mem_info_vram_total
-	MemClockMTs int `json:"mem_clock_mts,omitempty"` // amdgpu mem_info_freq (mclk) in MT/s
+	CPUTemp       int     `json:"cpu_temp,omitempty"`        // APU die temp, °C (k10temp Tctl)
+	GPUTemp       int     `json:"gpu_temp,omitempty"`        // iGPU edge temp, °C (amdgpu temp1)
+	CPUFanRPM     int     `json:"cpu_fan_rpm,omitempty"`     // fan1_input (CPU-side heatsink)
+	GPUFanRPM     int     `json:"gpu_fan_rpm,omitempty"`     // fan2_input (GPU-side heatsink)
+	CPUUtil       int     `json:"cpu_util,omitempty"`        // 0–100, /proc/stat jiffie delta
+	GPUUtil       int     `json:"gpu_util,omitempty"`        // 0–100, amdgpu gpu_busy_percent
+	NPUUtil       int     `json:"npu_util,omitempty"`        // 0–100, amdxdna column utilization (avg)
+	NPUPowerW     float64 `json:"npu_power_w,omitempty"`     // amdxdna NPU power draw, W (decimal, e.g. 1.85)
+	NPUClockMHz   int     `json:"npu_clock_mhz,omitempty"`   // amdxdna live npuclk from current DPM level
+	CPUClockMHz   int     `json:"cpu_clock_mhz,omitempty"`   // average scaling_cur_freq across cores
+	GPUClockMHz   int     `json:"gpu_clock_mhz,omitempty"`   // amdgpu freq1_input (sclk) or pp_dpm_sclk active
+	VRAMUsedMB    int     `json:"vram_used_mb,omitempty"`    // amdgpu mem_info_vram_used
+	VRAMTotalMB   int     `json:"vram_total_mb,omitempty"`   // amdgpu mem_info_vram_total
+	MemoryUsedMB  int     `json:"memory_used_mb,omitempty"`  // MemTotal - MemAvailable
+	MemoryTotalMB int     `json:"memory_total_mb,omitempty"` // Linux MemTotal
+	MemClockMTs   int     `json:"mem_clock_mts,omitempty"`   // amdgpu mem_info_freq (mclk) in MT/s
 }
 
 // BatteryState captures live battery telemetry from power_supply sysfs.
@@ -79,6 +86,33 @@ type CPUPowerState struct {
 	EPP             string   `json:"epp"`
 	EPPChoices      []string `json:"epp_choices"`
 	Boost           bool     `json:"boost"`
+}
+
+// CPUPowerPreset captures the CPU controls managed by a named preset.
+type CPUPowerPreset struct {
+	MinFrequencyKHz int    `json:"min_frequency_khz"`
+	EPP             string `json:"epp"`
+	Boost           bool   `json:"boost"`
+}
+
+// Preset is a named snapshot of performance and display settings.
+// A custom profile owns independent fan, TDP, and undervolt values.
+type Preset struct {
+	Profile        string          `json:"profile"`
+	BaseProfile    string          `json:"base_profile,omitempty"` // physical profile beneath virtual custom
+	FanCurve       *FanCurveState  `json:"fan_curve,omitempty"`
+	TDP            *TDPState       `json:"tdp,omitempty"`
+	Undervolt      *UndervoltState `json:"undervolt,omitempty"`
+	CPUPower       *CPUPowerPreset `json:"cpu_power,omitempty"`
+	RefreshRate    int             `json:"refresh_rate,omitempty"`
+	PanelOverdrive *int            `json:"panel_overdrive,omitempty"`
+}
+
+// PowerPolicy assigns named presets to AC and battery power sources.
+type PowerPolicy struct {
+	Enabled       bool   `json:"enabled"`
+	ACPreset      string `json:"ac_preset"`
+	BatteryPreset string `json:"battery_preset"`
 }
 
 // LightingState captures all parameters needed to reproduce one lighting zone.

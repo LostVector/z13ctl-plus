@@ -35,9 +35,15 @@ import (
 
 // Daemon holds the runtime state for the long-running z13ctl process.
 type Daemon struct {
-	mu    sync.Mutex
-	dev   *hid.Device // nil if no HID device was found at startup
-	state api.State
+	mu          sync.Mutex
+	applyMu     sync.Mutex
+	dev         *hid.Device // nil if no HID device was found at startup
+	state       api.State
+	powerSource string
+	policyCh    chan struct{}
+	displayMu   sync.Mutex
+	display     displayIntent
+	displayCh   chan struct{}
 
 	subMu       sync.Mutex
 	subscribers []net.Conn // long-lived connections subscribed to events
@@ -50,10 +56,16 @@ type Daemon struct {
 // Unix socket.
 func Run(ctx context.Context, watchBtn bool) error {
 	d := &Daemon{
-		buttonCh: make(chan struct{}, 4),
+		buttonCh:  make(chan struct{}, 4),
+		policyCh:  make(chan struct{}, 1),
+		displayCh: make(chan struct{}, 1),
 	}
 
 	d.state = loadState()
+	if err := d.seedDefaultPresets(); err != nil {
+		slog.Warn("failed to initialize power presets", "err", err)
+	}
+	policyManaged := d.applyInitialPowerPolicy()
 
 	dev, err := hid.FindDevice("")
 	if err != nil {
@@ -80,7 +92,7 @@ func Run(ctx context.Context, watchBtn bool) error {
 	// stopping fans — harmful on daemon restart where the profile hasn't
 	// changed. Skip "custom" — it's a virtual profile that the kernel
 	// rejects; custom fan curves and TDP are restored separately below.
-	if d.state.Profile != "" && d.state.Profile != "custom" {
+	if !policyManaged && d.state.Profile != "" && d.state.Profile != "custom" {
 		current := ""
 		if data, readErr := os.ReadFile(cli.FindProfilePath()); readErr == nil {
 			current = strings.TrimSpace(string(data))
@@ -114,7 +126,7 @@ func Run(ctx context.Context, watchBtn bool) error {
 	}
 
 	// Restore fan curve + TDP if last profile was "custom".
-	if d.state.Profile == "custom" {
+	if !policyManaged && d.state.Profile == "custom" {
 		if fc := d.state.FanCurve; fc != nil && fc.Mode == 1 && len(fc.Points) == 8 {
 			if fcErr := cli.SetBothFanCurves(fc.Points); fcErr != nil {
 				slog.Warn("failed to restore fan curve", "err", fcErr)
@@ -152,6 +164,10 @@ func Run(ctx context.Context, watchBtn bool) error {
 	}
 
 	go d.watchResume(ctx)
+
+	go d.watchPowerPolicy(ctx)
+
+	go d.watchDisplay(ctx)
 
 	go d.watchHotplug(ctx)
 

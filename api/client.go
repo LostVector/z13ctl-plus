@@ -44,6 +44,12 @@ type request struct {
 	PL2        string   `json:"pl2,omitempty"`
 	PL3        string   `json:"pl3,omitempty"`
 	Force      bool     `json:"force,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	Enabled    *bool    `json:"enabled,omitempty"`
+	ACPreset   string   `json:"ac_preset,omitempty"`
+	BatPreset  string   `json:"battery_preset,omitempty"`
+	Posture    string   `json:"posture,omitempty"`
+	Rotation   string   `json:"rotation,omitempty"`
 }
 
 // response is the reply to a command or a streamed event notification.
@@ -232,7 +238,8 @@ func SendCPUBoostSet(enabled bool) (bool, error) {
 	return sendSetting("cpu-boost", value)
 }
 
-// SendRefreshRateSet switches eDP-1 to the requested refresh rate (60 or 180).
+// SendRefreshRateSet publishes an eDP-1 refresh request to the display
+// coordinator. Application is asynchronous and waits for current posture.
 func SendRefreshRateSet(hz int) (bool, error) {
 	return sendSetting("refresh-rate", strconv.Itoa(hz))
 }
@@ -413,6 +420,55 @@ func SendUndervoltSet(cpu string) (bool, error) {
 // SendUndervoltReset resets Curve Optimizer to stock (0).
 func SendUndervoltReset() (bool, error) {
 	handled, resp, err := sendCommand(request{Cmd: "undervolt-reset"})
+	if !handled || err != nil {
+		return handled, err
+	}
+	if !resp.OK {
+		return true, fmt.Errorf("%s", resp.Error)
+	}
+	return true, nil
+}
+
+// SendPresetSave saves the daemon's current performance and display state as name.
+func SendPresetSave(name string) (bool, error) {
+	return sendPresetCommand(request{Cmd: "preset-save", Name: name})
+}
+
+// SendPresetApply applies a named preset.
+func SendPresetApply(name string) (bool, error) {
+	return sendPresetCommand(request{Cmd: "preset-apply", Name: name})
+}
+
+// SendPresetDelete deletes a named preset that is not assigned by the power policy.
+func SendPresetDelete(name string) (bool, error) {
+	return sendPresetCommand(request{Cmd: "preset-delete", Name: name})
+}
+
+// SendPowerPolicySet configures automatic AC/battery preset switching. Empty
+// preset names preserve the current assignments (or select AC/Battery defaults).
+func SendPowerPolicySet(enabled bool, acPreset, batteryPreset string) (bool, error) {
+	return sendPresetCommand(request{
+		Cmd:       "power-policy-set",
+		Enabled:   &enabled,
+		ACPreset:  acPreset,
+		BatPreset: batteryPreset,
+	})
+}
+
+// SendDisplayPosture publishes the current desktop, laptop, or tablet posture
+// to the daemon's display coordinator.
+func SendDisplayPosture(posture string) (bool, error) {
+	return sendPresetCommand(request{Cmd: "display-posture", Posture: posture})
+}
+
+// SendDisplayRotation publishes the desired tablet rotation to the daemon's
+// display coordinator.
+func SendDisplayRotation(rotation string) (bool, error) {
+	return sendPresetCommand(request{Cmd: "display-rotation", Rotation: rotation})
+}
+
+func sendPresetCommand(req request) (bool, error) {
+	handled, resp, err := sendCommand(req)
 	if !handled || err != nil {
 		return handled, err
 	}

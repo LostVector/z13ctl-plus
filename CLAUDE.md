@@ -25,6 +25,8 @@ cmd/                         Cobra subcommands
   list.go                    list hidraw devices
   off.go                     turn lighting off
   profile.go                 get/set performance profile (platform_profile sysfs); "custom" virtual profile
+  preset.go                  named presets + automatic AC/battery assignment CLI
+  display.go                 posture/rotation intent publisher for shared KScreen coordinator
   batterylimit.go            get/set battery charge limit (power_supply sysfs)
   bootsound.go               get/set POST boot sound (asus-armoury firmware-attributes)
   paneloverdrive.go          get/set panel refresh overdrive (asus-armoury firmware-attributes)
@@ -54,6 +56,8 @@ internal/
     state.go                 XDG state file persistence (uses api.State/api.LightingState)
     button.go                evdev button watcher (KEY_PROG3 / Armoury Crate button on 2025 Z13)
     hotplug.go               detachable-keyboard reattach watcher (polls sysfs, reopens HID + restores lighting)
+    preset.go                named preset capture/apply and AC/battery policy watcher
+    display.go               serialized/coalescing internal-panel display coordinator
     server.go                JSON request handler; handleConn(), dispatch(), command handlers
     resume.go                DBus logind PrepareForSleep watcher; turns off lightbar on sleep, restores lighting + volatile state on resume
     client.go                Redirect comment only — client functions live in api/
@@ -98,6 +102,17 @@ contrib/
 - **State persistence**: `$XDG_STATE_HOME/z13ctl/state.json` (atomic write via temp +
   rename). Daemon restores lighting, fan curves, and TDP on start. Fan curves and
   TDP are only restored when `profile == "custom"` (stock profiles let firmware manage).
+- **Named presets and power policy**: Presets independently capture profile,
+  fan/TDP/undervolt, CPU min/EPP/boost, panel overdrive, and refresh rate. The
+  daemon polls external `power_supply` devices and applies assigned AC/battery
+  presets only at startup or a real source transition; manual overrides last
+  until the next transition. Refresh intent is handled by the shared display
+  coordinator rather than issuing independent KScreen writes.
+- **Shared display coordinator**: z13ctl is the sole KScreen writer for the
+  z13ctl + z13-tablet-kit integration. Tablet-kit publishes posture/rotation;
+  presets publish refresh intent. The daemon coalesces them into one
+  internal-panel transaction, never touches external outputs, waits 10 seconds
+  after desktop/dock posture, and skips writes while eDP-1 is disabled.
 - **Button watcher**: Finds "Asus WMI hotkeys" input device by sysfs name
   (`/sys/class/input/*/device/name`), opens it, grabs it exclusively with EVIOCGRAB,
   and listens for KEY_PROG3 (code 202) key-down events. KEY_PROG3 is the Armoury Crate
@@ -131,6 +146,10 @@ contrib/
   | undervolt get | `{"cmd":"undervolt-get"}` | `ok`, `value` (JSON: `cpu_co`, `active`, `profile`) |
   | undervolt reset | `{"cmd":"undervolt-reset"}` | `ok` |
   | full state | `{"cmd":"get-state"}` | `ok`, `state` (cached + sysfs + live temp/RPM + undervolt_available) |
+  | preset save/apply/delete | `{"cmd":"preset-save","name":"Gaming"}` (or `preset-apply`, `preset-delete`) | `ok` |
+  | power policy | `{"cmd":"power-policy-set","enabled":true,"ac_preset":"AC","battery_preset":"Battery"}` | `ok` |
+  | display posture | `{"cmd":"display-posture","posture":"tablet"}` | `ok` |
+  | display rotation | `{"cmd":"display-rotation","rotation":"left"}` | `ok` |
   | subscribe | `{"cmd":"subscribe","events":["gui-toggle"]}` | `ok`, then streams events |
 - **IPC library**: Hand-rolled JSON. gRPC/drpc require protobuf code generation;
   `net/rpc` lacks streaming; Twirp is HTTP-only. Decky plugin Python backend connects

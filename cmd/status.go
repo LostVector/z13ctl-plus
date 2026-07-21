@@ -91,7 +91,8 @@ func runStatus() error {
 		fmt.Printf("  NPU:    %d%%, %.2fW, %s\n", t.NPUUtil, t.NPUPowerW, formatClock(t.NPUClockMHz))
 	}
 	fmt.Printf("  VRAM:   %d / %d MB\n", t.VRAMUsedMB, t.VRAMTotalMB)
-	fmt.Printf("  Memory: %d MT/s\n", t.MemClockMTs)
+	fmt.Printf("  Memory: %d / %d MB\n", t.MemoryUsedMB, t.MemoryTotalMB)
+	fmt.Printf("  Mem clk: %d MT/s\n", t.MemClockMTs)
 
 	return nil
 }

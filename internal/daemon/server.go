@@ -39,6 +39,12 @@ type request struct {
 	PL2        string   `json:"pl2,omitempty"`
 	PL3        string   `json:"pl3,omitempty"`
 	Force      bool     `json:"force,omitempty"`
+	Name       string   `json:"name,omitempty"`
+	Enabled    *bool    `json:"enabled,omitempty"`
+	ACPreset   string   `json:"ac_preset,omitempty"`
+	BatPreset  string   `json:"battery_preset,omitempty"`
+	Posture    string   `json:"posture,omitempty"`
+	Rotation   string   `json:"rotation,omitempty"`
 }
 
 // response is the reply to a command or a streamed event notification.
@@ -82,6 +88,10 @@ func (d *Daemon) handleConn(conn net.Conn) {
 }
 
 func (d *Daemon) dispatch(req request) response {
+	if commandNeedsApplyLock(req.Cmd) {
+		d.applyMu.Lock()
+		defer d.applyMu.Unlock()
+	}
 	switch req.Cmd {
 	case "apply":
 		return d.handleApply(req)
@@ -106,13 +116,13 @@ func (d *Daemon) dispatch(req request) response {
 	case "paneloverdrive-get":
 		return handlePanelOverdriveGet()
 	case "cpu-min":
-		return handleCPUMin(req)
+		return d.handleCPUMin(req)
 	case "cpu-epp":
-		return handleCPUEPP(req)
+		return d.handleCPUEPP(req)
 	case "cpu-boost":
-		return handleCPUBoost(req)
+		return d.handleCPUBoost(req)
 	case "refresh-rate":
-		return handleRefreshRate(req)
+		return d.handleRefreshRate(req)
 	case "refresh-rate-get":
 		return handleRefreshRateGet()
 	case "fancurve":
@@ -133,9 +143,44 @@ func (d *Daemon) dispatch(req request) response {
 		return d.handleUndervoltGet()
 	case "undervolt-reset":
 		return d.handleUndervoltReset()
+	case "preset-save":
+		if err := d.savePreset(req.Name); err != nil {
+			return response{OK: false, Error: err.Error()}
+		}
+		return response{OK: true}
+	case "preset-apply":
+		if err := d.applyPreset(req.Name); err != nil {
+			return response{OK: false, Error: err.Error()}
+		}
+		return response{OK: true}
+	case "preset-delete":
+		if err := d.deletePreset(req.Name); err != nil {
+			return response{OK: false, Error: err.Error()}
+		}
+		return response{OK: true}
+	case "power-policy-set":
+		if req.Enabled == nil {
+			return response{OK: false, Error: "power policy requires enabled"}
+		}
+		if err := d.setPowerPolicy(*req.Enabled, req.ACPreset, req.BatPreset); err != nil {
+			return response{OK: false, Error: err.Error()}
+		}
+		return response{OK: true}
+	case "display-posture":
+		if err := d.setDisplayPosture(req.Posture); err != nil {
+			return response{OK: false, Error: err.Error()}
+		}
+		return response{OK: true}
+	case "display-rotation":
+		if err := d.setDisplayRotation(req.Rotation); err != nil {
+			return response{OK: false, Error: err.Error()}
+		}
+		return response{OK: true}
 	case "get-state":
 		d.mu.Lock()
 		s := d.state
+		s.Presets = clonePresetMap(d.state.Presets)
+		s.PowerPolicy = clonePowerPolicy(d.state.PowerPolicy)
 		d.mu.Unlock()
 		// Populate firmware-managed fields from sysfs (not cached in daemon state).
 		s.BootSound = readIntSysfs(cli.FindBootSoundPath())
@@ -166,13 +211,28 @@ func (d *Daemon) dispatch(req request) response {
 		if bat, err := cli.ReadBatteryState(); err == nil {
 			s.BatteryDetail = bat
 		}
+		d.mu.Lock()
+		s.PowerSource = d.powerSource
+		d.mu.Unlock()
 		return response{OK: true, State: &s}
 	default:
 		return response{OK: false, Error: "unknown command: " + req.Cmd}
 	}
 }
 
-func handleCPUMin(req request) response {
+func commandNeedsApplyLock(cmd string) bool {
+	switch cmd {
+	case "apply", "off", "brightness", "profile", "batterylimit", "bootsound",
+		"paneloverdrive", "cpu-min", "cpu-epp", "cpu-boost", "refresh-rate",
+		"fancurve", "fancurve-reset", "tdp", "tdp-reset", "undervolt", "undervolt-reset",
+		"preset-save":
+		return true
+	default:
+		return false
+	}
+}
+
+func (d *Daemon) handleCPUMin(req request) response {
 	khz, err := strconv.Atoi(req.Set)
 	if err != nil {
 		return response{OK: false, Error: "CPU minimum frequency must be an integer in kHz"}
@@ -180,17 +240,19 @@ func handleCPUMin(req request) response {
 	if err := cli.SetCPUMinFrequency(khz); err != nil {
 		return response{OK: false, Error: err.Error()}
 	}
+	d.clearActivePreset()
 	return response{OK: true}
 }
 
-func handleCPUEPP(req request) response {
+func (d *Daemon) handleCPUEPP(req request) response {
 	if err := cli.SetCPUEPP(req.Set); err != nil {
 		return response{OK: false, Error: err.Error()}
 	}
+	d.clearActivePreset()
 	return response{OK: true}
 }
 
-func handleCPUBoost(req request) response {
+func (d *Daemon) handleCPUBoost(req request) response {
 	value, err := strconv.Atoi(req.Set)
 	if err != nil || (value != 0 && value != 1) {
 		return response{OK: false, Error: "CPU boost must be 0 or 1"}
@@ -198,6 +260,7 @@ func handleCPUBoost(req request) response {
 	if err := cli.SetCPUBoost(value == 1); err != nil {
 		return response{OK: false, Error: err.Error()}
 	}
+	d.clearActivePreset()
 	return response{OK: true}
 }
 
@@ -209,15 +272,16 @@ func handleRefreshRateGet() response {
 }
 
 // handleRefreshRate switches eDP-1 to the requested refresh rate.
-func handleRefreshRate(req request) response {
+func (d *Daemon) handleRefreshRate(req request) response {
 	hz, err := strconv.Atoi(req.Set)
 	if err != nil {
 		return response{OK: false, Error: "refresh rate must be an integer in Hz"}
 	}
-	if err := cli.SetRefreshRate(hz); err != nil {
+	if err := d.setDisplayRefresh(hz); err != nil {
 		return response{OK: false, Error: err.Error()}
 	}
 	slog.Info("refresh-rate", "hz", hz)
+	d.clearActivePreset()
 	return response{OK: true}
 }
 
@@ -415,6 +479,7 @@ func (d *Daemon) handleProfile(req request) response {
 			return response{OK: false, Error: "no custom settings saved; set fan curve, TDP, or undervolt first"}
 		}
 		d.state.Profile = "custom"
+		d.state.ActivePreset = ""
 		// Re-apply saved fan curve to both fans.
 		if fc := d.state.FanCurve; fc != nil && fc.Mode == 1 && len(fc.Points) == 8 {
 			if err := cli.SetBothFanCurves(fc.Points); err != nil {
@@ -464,6 +529,7 @@ func (d *Daemon) handleProfile(req request) response {
 	slog.Info("profile", "set", profile)
 	d.mu.Lock()
 	d.state.Profile = profile
+	d.state.ActivePreset = ""
 	if d.state.Undervolt != nil {
 		d.state.Undervolt.Active = false
 	}
@@ -533,6 +599,7 @@ func (d *Daemon) handlePanelOverdrive(req request) response {
 	slog.Info("paneloverdrive", "set", value)
 	d.mu.Lock()
 	d.state.PanelOverdrive = value
+	d.state.ActivePreset = ""
 	s := d.state
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {
@@ -609,6 +676,7 @@ func (d *Daemon) handleFanCurve(req request) response {
 	d.mu.Lock()
 	d.state.FanCurve = &api.FanCurveState{Mode: 1, Points: points}
 	d.state.Profile = "custom"
+	d.state.ActivePreset = ""
 	s := d.state
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {
@@ -624,6 +692,7 @@ func (d *Daemon) handleFanCurveReset() response {
 	slog.Info("fancurve-reset", "fans", "both")
 	d.mu.Lock()
 	d.state.FanCurve = nil
+	d.state.ActivePreset = ""
 	s := d.state
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {
@@ -716,6 +785,7 @@ func (d *Daemon) handleTDP(req request) response {
 		PlatformSPPT: pl2,
 	}
 	d.state.Profile = "custom"
+	d.state.ActivePreset = ""
 	fc := d.state.FanCurve
 	s := d.state
 	d.mu.Unlock()
@@ -752,6 +822,7 @@ func (d *Daemon) handleTDPReset() response {
 	d.state.TDP = nil
 	d.state.FanCurve = nil
 	d.state.Profile = "balanced"
+	d.state.ActivePreset = ""
 	s := d.state
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {
@@ -808,6 +879,7 @@ func (d *Daemon) handleUndervolt(req request) response {
 	d.mu.Lock()
 	d.state.Undervolt = &api.UndervoltState{CPUCO: cpuOffset, Active: true}
 	d.state.Profile = "custom"
+	d.state.ActivePreset = ""
 	s := d.state
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {
@@ -828,6 +900,7 @@ func (d *Daemon) handleUndervoltReset() response {
 	slog.Info("undervolt-reset")
 	d.mu.Lock()
 	d.state.Undervolt = nil
+	d.state.ActivePreset = ""
 	s := d.state
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {

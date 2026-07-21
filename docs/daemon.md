@@ -126,6 +126,9 @@ The file is written atomically after every successful command. It stores:
 - `undervolt` — CPU Curve Optimizer offset and active flag (preserved across
   profile switches for recall; `undervolt-get` includes the current profile so
   clients can distinguish active vs saved values)
+- `presets` — named performance/display snapshots
+- `power_policy` — automatic AC and battery preset assignments
+- `active_preset` — the last fully applied preset
 
 On `get-state` requests the daemon also populates `temperature` (APU die
 temperature in °C), `fan_rpm` (fan speed in RPM), `cpu_power` (live cpufreq
@@ -141,6 +144,25 @@ TDP values, and undervolt offsets are re-applied to the hardware.
     Commands sent with `--device /dev/hidraw2` (a raw path) are applied but
     not saved — raw device numbers are transient and may change across reboots.
     Use `keyboard` or `lightbar` by name for persistent per-zone settings.
+
+## AC/battery preset switching
+
+The daemon reads external power state from `/sys/class/power_supply` and applies
+the configured AC or battery preset after the source settles. It does not infer
+AC state from battery charging status, so charge thresholds and full batteries
+do not produce false transitions.
+
+Display refresh is submitted as intent to the daemon's display coordinator.
+The coordinator waits for posture from `z13-tablet-kit`, serializes internal
+refresh, scale, and rotation changes, and combines pending values into one
+`kscreen-doctor` transaction. External outputs are never included. Desktop
+posture waits ten seconds for dock topology to settle, and a disabled `eDP-1`
+is left untouched. KWin remains the output owner.
+
+Manual preset changes are not continuously overwritten. On resume, an active
+named preset is restored in full; otherwise the daemon restores the current
+manual profile and volatile custom settings. Display posture intent is then
+reconciled without replacing the manual choice with a source default.
 
 ---
 

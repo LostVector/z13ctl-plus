@@ -121,6 +121,46 @@ func ReadVRAM() (used, total int, err error) {
 	return used / (1024 * 1024), total / (1024 * 1024), nil
 }
 
+// ReadMemory returns actionable Linux memory usage in MiB. MemAvailable
+// includes reclaimable cache, so total - available reflects memory pressure
+// better than total - free.
+func ReadMemory() (used, total int, err error) {
+	f, err := os.Open("/proc/meminfo")
+	if err != nil {
+		return 0, 0, err
+	}
+	defer f.Close()
+
+	var totalKB, availableKB int
+	var foundTotal, foundAvailable bool
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 2 {
+			continue
+		}
+		value, parseErr := strconv.Atoi(fields[1])
+		if parseErr != nil {
+			continue
+		}
+		switch fields[0] {
+		case "MemTotal:":
+			totalKB = value
+			foundTotal = true
+		case "MemAvailable:":
+			availableKB = value
+			foundAvailable = true
+		}
+	}
+	if err := scanner.Err(); err != nil {
+		return 0, 0, err
+	}
+	if !foundTotal || !foundAvailable || totalKB <= 0 || availableKB < 0 || availableKB > totalKB {
+		return 0, 0, fmt.Errorf("invalid memory totals")
+	}
+	return (totalKB - availableKB) / 1024, totalKB / 1024, nil
+}
+
 // ReadMemClockMTs returns the iGPU memory clock in MT/s (mega-transfers/sec).
 // Tries amdgpu's mem_info_freq first (discrete GPUs, already in MT/s); falls
 // back to parsing pp_dpm_mclk on APUs where mem_info_freq is absent. The
@@ -325,6 +365,10 @@ func ReadTelemetry() *api.TelemetryState {
 	if used, total, err := ReadVRAM(); err == nil {
 		t.VRAMUsedMB = used
 		t.VRAMTotalMB = total
+	}
+	if used, total, err := ReadMemory(); err == nil {
+		t.MemoryUsedMB = used
+		t.MemoryTotalMB = total
 	}
 	if v, err := ReadMemClockMTs(); err == nil {
 		t.MemClockMTs = v

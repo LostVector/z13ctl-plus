@@ -127,6 +127,61 @@ z13ctl profile --set custom
 
 ---
 
+## preset
+
+Save, apply, and automatically select named performance presets. Presets capture
+the logical profile, custom fan/TDP/undervolt settings, CPU minimum/EPP/boost,
+panel overdrive, and display refresh rate. The daemon must be running.
+
+```sh
+z13ctl preset list
+z13ctl preset save Gaming
+z13ctl preset apply Gaming
+z13ctl preset delete Gaming
+z13ctl preset policy --enable --ac AC --battery Battery
+z13ctl preset policy --disable
+```
+
+The first daemon start after upgrading creates two presets from the current
+machine state:
+
+| Preset | Defaults |
+|--------|----------|
+| `AC` | Current saved tuning with the display set to 180 Hz |
+| `Battery` | Quiet profile, minimum CPU frequency, `power` EPP, boost off, panel overdrive off, 60 Hz |
+
+Automatic switching runs in the user daemon, not a root udev rule. It changes
+the KDE display mode through KWin/KScreen and only acts at startup or an actual
+AC transition. A manually applied preset remains active until the next
+power-source transition.
+
+Saving an existing name updates that preset. A preset assigned to AC or battery
+cannot be deleted until another preset is assigned in its place.
+
+---
+
+## display
+
+Publish posture and rotation intent to the daemon's internal-panel coordinator.
+These commands are used by `z13-tablet-kit`; they require the daemon and never
+fall back to direct KScreen writes.
+
+```sh
+z13ctl display posture desktop
+z13ctl display posture laptop
+z13ctl display posture tablet
+z13ctl display rotation none
+z13ctl display rotation left
+```
+
+The coordinator is the sole KScreen writer for z13ctl integrations. Desktop and
+laptop use scale 1.5; tablet uses scale 2.0. It combines refresh, scale, and
+rotation changes into one transaction for `eDP-1`, never changes external
+outputs, waits for dock topology to settle, and skips all writes while the
+internal panel is disabled.
+
+---
+
 ## batterylimit
 
 Get or set the battery charge limit via the Linux ACPI `power_supply` sysfs
