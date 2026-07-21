@@ -20,8 +20,40 @@ type State struct {
 	CPUPower           *CPUPowerState           `json:"cpu_power,omitempty"`
 	RefreshRate        int                      `json:"refresh_rate,omitempty"` // eDP-1 refresh rate in Hz (0 = unknown)
 	BatteryDetail      *BatteryState            `json:"battery_detail,omitempty"`
-	Temperature        int                      `json:"temperature,omitempty"` // APU temp, degrees Celsius
-	FanRPM             int                      `json:"fan_rpm,omitempty"`     // fan1 speed in RPM
+	Temperature        int `json:"temperature,omitempty"` // APU temp, degrees Celsius (legacy; also in Telemetry)
+	FanRPM             int `json:"fan_rpm,omitempty"`     // fan1 speed in RPM (legacy; also in Telemetry)
+	Telemetry          *TelemetryState `json:"telemetry,omitempty"` // live sensor readings
+}
+
+// TelemetryState captures live sensor readings from the AMD Strix Halo SoC.
+// CPU values come from k10temp + cpufreq + /proc/stat. GPU values come from
+// the amdgpu driver sysfs (hwmon + drm device). NPU values come from the
+// amdxdna DRM accel driver via ioctl (power, column utilization, clock).
+// VRAM reflects the iGPU carveout in unified memory. All values are sampled
+// at read time; the daemon does not average or smooth them.
+//
+// CPUUtil is computed as the delta of /proc/stat jiffies between successive
+// calls, so the first call after daemon start may report 0. Subsequent calls
+// reflect the utilisation over the interval since the previous call.
+//
+// Fields are reported as 0 (zero value) when the underlying sensor is
+// unavailable, not as -1, so callers can do simple presence checks via the
+// parent State.Telemetry == nil.
+type TelemetryState struct {
+	CPUTemp     int `json:"cpu_temp,omitempty"`      // APU die temp, °C (k10temp Tctl)
+	GPUTemp     int `json:"gpu_temp,omitempty"`      // iGPU edge temp, °C (amdgpu temp1)
+	CPUFanRPM   int `json:"cpu_fan_rpm,omitempty"`   // fan1_input (CPU-side heatsink)
+	GPUFanRPM   int `json:"gpu_fan_rpm,omitempty"`   // fan2_input (GPU-side heatsink)
+	CPUUtil     int `json:"cpu_util,omitempty"`      // 0–100, /proc/stat jiffie delta
+	GPUUtil     int `json:"gpu_util,omitempty"`      // 0–100, amdgpu gpu_busy_percent
+	NPUUtil     int `json:"npu_util,omitempty"`      // 0–100, amdxdna column utilization (avg)
+	NPUPowerW   int `json:"npu_power_w,omitempty"`   // amdxdna NPU power draw, W
+	NPUClockMHz int `json:"npu_clock_mhz,omitempty"` // amdxdna MP-NPU clock, MHz
+	CPUClockMHz int `json:"cpu_clock_mhz,omitempty"` // average scaling_cur_freq across cores
+	GPUClockMHz int `json:"gpu_clock_mhz,omitempty"` // amdgpu freq1_input (sclk) or pp_dpm_sclk active
+	VRAMUsedMB  int `json:"vram_used_mb,omitempty"`  // amdgpu mem_info_vram_used
+	VRAMTotalMB int `json:"vram_total_mb,omitempty"` // amdgpu mem_info_vram_total
+	MemClockMTs int `json:"mem_clock_mts,omitempty"` // amdgpu mem_info_freq (mclk) in MT/s
 }
 
 // BatteryState captures live battery telemetry from power_supply sysfs.

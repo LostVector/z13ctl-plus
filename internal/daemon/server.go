@@ -158,6 +158,8 @@ func (d *Daemon) dispatch(req request) response {
 		if rpms, err := cli.ReadBothFanRPM(); err == nil {
 			s.FanRPM = rpms[0]
 		}
+		// Populate live telemetry (CPU/GPU temp, util, clocks, VRAM, mem clock).
+		s.Telemetry = cli.ReadTelemetry()
 		// Populate eDP-1 refresh rate from kscreen-doctor.
 		s.RefreshRate = cli.ReadRefreshRate()
 		// Populate battery detail (health, power draw, status).
