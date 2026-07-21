@@ -210,39 +210,32 @@ contrib/
   because the driver pins DPM at max whenever any process holds the device
   open — but it is not metadata. Older `amdxdna` versions (pre-7.0) may not
   update `npuclk_freq` and would report a fixed value.
-- **NPU power mode (`z13ctl npu --set turbo`)**: the same `internal/cli/npu.go`
-  also gets/sets the NPU DPM power mode (DEFAULT/HIGH/TURBO) via
-  `DRM_AMDXDNA_GET_POWER_MODE` (param 9) and `DRM_AMDXDNA_SET_STATE` with
-  `DRM_AMDXDNA_SET_POWER_MODE`. The mode is volatile — it resets on sleep and
-  the daemon does not persist it. **Important**: the driver marks SET_STATE
-  as `DRM_ROOT_ONLY` in its ioctl table (`amdxdna_pci_drv.c`), so `--set`
-  requires `CAP_SYS_ADMIN` (root via sudo, or `setcap cap_sys_admin+ep` on
-  the binary). udev rules cannot grant this — it is enforced inside DRM core,
-  not via file permissions. `--get` is unprivileged. Daemon handler also
-  requires the daemon itself to run as root to actually mutate the mode.
-  **Only 3 of 5 uAPI modes work**: `aie2_pm_set_mode` (`aie2_pm.c:82-126`)
-  only implements DEFAULT (which equals max DPM on NPU5 because
-  `dft_dpm_level == max_dpm_level`), HIGH (max DPM, clk_gating on), and
-  TURBO (max DPM, clk_gating off, refused if any hwctx is active). LOW and
-  MEDIUM fall through to the `default:` case and return `-EOPNOTSUPP`, so
-  z13ctl rejects them in `NPUPowerModeFromString` before calling the ioctl.
-  Net effect on Strix Halo: all three working modes run at the same npuclk
-  (1267 MHz) — the DPM table has 8 levels (396-1267 MHz) but the power_mode
-  interface doesn't expose them.
-  **Empirically (Qwen3-0.6B sustained generation, 12 samples per mode)**:
-  default=2.14W, high=2.16W, turbo=2.16W — within 20mW of each other, well
-  below sensor noise. TURBO's clk_gating-off setting provides no measurable
-  benefit for sustained workloads because there are no idle blocks to gate
-  when the NPU is continuously busy.
-  **Bursty load test (40-token generations every 6s, 5s idle gaps)**: all
-  three modes show identical decay curves, troughing at 0.42-0.43W between
-  bursts — 10mW spread, indistinguishable. The 0.42W floor (vs 0.00W when
-  the device is fully released) is the device-open leakage at the pinned
-  max DPM level; `power_mode` cannot reduce it. **Conclusion: across both
-  sustained and bursty workloads, DEFAULT/HIGH/TURBO are functionally
-  equivalent in measured power. The only knob that moves NPU power is
-  whether the device file is held open by any process** — which the
-  `power_mode` interface does not affect. DEFAULT is the right choice.
+- **NPU power modes — NOT EXPOSED**: the amdxdna driver's DPM power_mode
+  interface (DEFAULT/HIGH/TURBO via `DRM_AMDXDNA_SET_STATE` with
+  `DRM_AMDXDNA_SET_POWER_MODE`) was implemented and then removed after
+  empirical A/B testing proved it has no measurable effect. Findings:
+  - The driver marks SET_STATE as `DRM_ROOT_ONLY` (`amdxdna_pci_drv.c`),
+    so setting modes required `CAP_SYS_ADMIN`.
+  - Only 3 of 5 uAPI modes work: `aie2_pm_set_mode` (`aie2_pm.c:82-126`)
+    implements DEFAULT (which equals max DPM on NPU5 because
+    `dft_dpm_level == max_dpm_level`), HIGH (max DPM, clk_gating on), and
+    TURBO (max DPM, clk_gating off). LOW and MEDIUM return `-EOPNOTSUPP`.
+  - **Sustained generation A/B (Qwen3-0.6B, 12 samples per mode)**:
+    default=2.14W, high=2.16W, turbo=2.16W — within 20mW of each other.
+  - **Bursty A/B (40-token generations every 6s, 5s idle gaps)**: all three
+    modes show identical decay curves, troughing at 0.42-0.43W between
+    bursts — 10mW spread, indistinguishable from sensor noise.
+  - **Root cause**: the driver pins DPM at max whenever any process holds
+    `/dev/accel/accelN` open. The 0.42W idle floor (vs 0.00W when the
+    device is fully released) is device-open leakage at the pinned max DPM
+    level; `power_mode` cannot reduce it. The only knob that moves NPU
+    power is whether the device file is open, which is application
+    behavior, not a mode setting.
+  - **Conclusion**: DEFAULT/HIGH/TURBO are functionally equivalent in
+    measured power across sustained AND bursty workloads. Exposing the
+    interface would mislead users into thinking they can save power;
+    honest UX is to omit it. The amdxdna driver may improve in future
+    versions; if so, re-adding the CLI surface is ~1 hour of work.
 - **Sleep/resume hook**: `internal/daemon/resume.go` watches for DBus
   `org.freedesktop.login1.Manager.PrepareForSleep` signals. On sleep
   (`PrepareForSleep(true)`), turns off the lightbar via `aura.TurnOff()` (the

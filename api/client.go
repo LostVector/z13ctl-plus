@@ -213,35 +213,6 @@ func SendPanelOverdriveSet(value int) (bool, error) {
 	return true, nil
 }
 
-// SendNPUPowerModeSet sends an NPU power mode set command to the daemon.
-// Mode is 0–4 (DEFAULT/LOW/MEDIUM/HIGH/TURBO).
-func SendNPUPowerModeSet(mode int) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "npu", Set: fmt.Sprintf("%d", mode)})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
-}
-
-// SendNPUPowerModeGet reads the current NPU power mode from the daemon.
-func SendNPUPowerModeGet() (handled bool, value int, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "npu-get"})
-	if !handled || err != nil {
-		return handled, 0, err
-	}
-	if !resp.OK {
-		return true, 0, fmt.Errorf("%s", resp.Error)
-	}
-	if _, scanErr := fmt.Sscan(resp.Value, &value); scanErr != nil {
-		return true, 0, fmt.Errorf("invalid npu power mode %q: %w", resp.Value, scanErr)
-	}
-	return true, value, nil
-}
-
 // SendCPUMinFrequencySet sets the minimum CPU frequency for every cpufreq policy.
 func SendCPUMinFrequencySet(khz int) (bool, error) {
 	return sendSetting("cpu-min", strconv.Itoa(khz))

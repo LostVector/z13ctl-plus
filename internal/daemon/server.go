@@ -105,10 +105,6 @@ func (d *Daemon) dispatch(req request) response {
 		return d.handlePanelOverdrive(req)
 	case "paneloverdrive-get":
 		return handlePanelOverdriveGet()
-	case "npu":
-		return d.handleNPUPowerMode(req)
-	case "npu-get":
-		return handleNPUPowerModeGet()
 	case "cpu-min":
 		return handleCPUMin(req)
 	case "cpu-epp":
@@ -144,9 +140,6 @@ func (d *Daemon) dispatch(req request) response {
 		// Populate firmware-managed fields from sysfs (not cached in daemon state).
 		s.BootSound = readIntSysfs(cli.FindBootSoundPath())
 		s.PanelOverdrive = readIntSysfs(cli.FindPanelOverdrivePath())
-		if mode, err := cli.ReadNPUPowerMode(); err == nil {
-			s.NPUPowerMode = mode
-		}
 		if cpuPower, err := cli.ReadCPUPower(); err == nil {
 			s.CPUPower = &cpuPower
 		}
@@ -540,33 +533,6 @@ func (d *Daemon) handlePanelOverdrive(req request) response {
 	slog.Info("paneloverdrive", "set", value)
 	d.mu.Lock()
 	d.state.PanelOverdrive = value
-	s := d.state
-	d.mu.Unlock()
-	if err := saveState(s); err != nil {
-		slog.Warn("failed to save state", "err", err)
-	}
-	return response{OK: true}
-}
-
-func handleNPUPowerModeGet() response {
-	mode, err := cli.ReadNPUPowerMode()
-	if err != nil {
-		return response{OK: false, Error: "reading npu power mode: " + err.Error()}
-	}
-	return response{OK: true, Value: strconv.Itoa(mode)}
-}
-
-func (d *Daemon) handleNPUPowerMode(req request) response {
-	value, err := strconv.Atoi(req.Set)
-	if err != nil || !(value == 0 || value == 3 || value == 4) {
-		return response{OK: false, Error: "npu power mode must be 0 (default), 3 (high), or 4 (turbo); LOW and MEDIUM are not implemented by the amdxdna driver"}
-	}
-	if err := cli.SetNPUPowerMode(value); err != nil {
-		return response{OK: false, Error: "npu power mode: " + err.Error()}
-	}
-	slog.Info("npu", "power_mode", value, "name", cli.NPUPowerModeName(value))
-	d.mu.Lock()
-	d.state.NPUPowerMode = value
 	s := d.state
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {

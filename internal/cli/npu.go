@@ -13,11 +13,18 @@ package cli
 // The accel char device (/dev/accel/accelN) is opened per call to match the
 // amdgpu sysfs reader pattern; the cost is one extra open per telemetry pull.
 // Requires render-group access (same perms as the amdgpu DRM node).
+//
+// We deliberately do NOT expose the amdxdna DPM power_mode interface
+// (DEFAULT/HIGH/TURBO via DRM_AMDXDNA_SET_STATE). Empirical A/B testing
+// (Qwen3-0.6B sustained + bursty workloads) showed all three modes draw
+// within 10-20mW of each other — the driver pins DPM at max whenever any
+// process holds the device open, so the mode setting has no measurable
+// effect. Only "is the device open?" moves NPU power, and that's an
+// application behavior, not a mode we can toggle.
 
 import (
 	"fmt"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -28,44 +35,24 @@ const (
 	// _IOWR('d', 0x40+7, struct amdxdna_drm_get_info) on x86_64 Linux.
 	// dir=3 (RW), magic='d'=0x64, nr=0x47, size=16 -> 0xC0106447.
 	amdxdnaIoctlGetInfo = 0xC0106447
-	// _IOWR('d', 0x40+8, struct amdxdna_drm_set_state), same size -> 0xC0106448.
-	amdxdnaIoctlSetState = 0xC0106448
 
 	drmAmdxdnaQueryClockMetadata = 3 // enum amdxdna_drm_get_param
 	drmAmdxdnaQuerySensors       = 4
-	drmAmdxdnaGetPowerMode       = 9
-
-	drmAmdxdnaSetPowerMode = 0 // enum amdxdna_drm_set_param
 
 	amdxdnaSensorPower             = 0 // enum amdxdna_sensor_type
 	amdxdnaSensorColumnUtilization = 1
 
-	// NPU power mode values (enum amdxdna_power_mode_type).
-	NPUPowerModeDefault = 0 // fallback to calculated DPM
-	NPUPowerModeLow     = 1 // lowest DPM
-	NPUPowerModeMedium  = 2 // medium DPM
-	NPUPowerModeHigh    = 3 // highest DPM
-	NPUPowerModeTurbo   = 4 // maximum power
-
 	amdxdnaSensorSize  = 168 // unsafe.Sizeof(amdxdnaQuerySensor{})
 	amdxdnaClockMDSize = 48  // unsafe.Sizeof(amdxdnaQueryClockMetadata{})
-	amdxdnaPowerModeSz = 8   // unsafe.Sizeof(amdxdnaDrmPowerMode{}
 )
 
 // amdxdnaDrmGetInfo mirrors struct amdxdna_drm_get_info (16 bytes).
-// Also used for SET_STATE — struct amdxdna_drm_set_state has the same layout.
 // buffer is unsafe.Pointer (not uint64) so the GC keeps the backing slice
 // alive across the syscall; the byte layout matches the kernel's __u64.
 type amdxdnaDrmGetInfo struct {
 	param      uint32
 	bufferSize uint32
 	buffer     unsafe.Pointer
-}
-
-// amdxdnaDrmPowerMode mirrors struct amdxdna_drm_(get|set)_power_mode (8 bytes).
-type amdxdnaDrmPowerMode struct {
-	mode uint8
-	pad  [7]byte
 }
 
 // amdxdnaQuerySensor mirrors struct amdxdna_drm_query_sensor (168 bytes).
@@ -166,7 +153,6 @@ func npuQuery(param uint32, minBytes int) ([]byte, error) {
 			uintptr(amdxdnaIoctlGetInfo),
 			uintptr(unsafe.Pointer(&req)),
 		)
-		runtime.KeepAlive(buf)
 		if errno != 0 {
 			// Driver returns ERANGE with the needed size written back when
 			// the caller-supplied buffer is too small.
@@ -186,8 +172,7 @@ func npuQuery(param uint32, minBytes int) ([]byte, error) {
 // are unavailable. Multiple column-utilization sensors (Strix Halo exposes one
 // per AIE column) are averaged to a single busy percentage.
 //
-// Power is reported with sub-watt precision (the driver exposes mW); useful
-// for comparing power modes under the same workload.
+// Power is reported with sub-watt precision (the driver exposes mW).
 func ReadNPUSensors() (powerW float64, utilPct int, err error) {
 	payload, err := npuQuery(drmAmdxdnaQuerySensors, 0)
 	if err != nil {
@@ -231,99 +216,4 @@ func ReadNPUClockMHz() (int, error) {
 	}
 	md := (*amdxdnaQueryClockMetadata)(unsafe.Pointer(&payload[0]))
 	return int(md.mpNpuClock.freqMHz), nil
-}
-
-// ReadNPUPowerMode returns the current NPU DPM power mode
-// (0=DEFAULT, 1=LOW, 2=MEDIUM, 3=HIGH, 4=TURBO), or (0, err) if unavailable.
-func ReadNPUPowerMode() (int, error) {
-	payload, err := npuQuery(drmAmdxdnaGetPowerMode, amdxdnaPowerModeSz)
-	if err != nil {
-		return 0, err
-	}
-	if len(payload) < amdxdnaPowerModeSz {
-		return 0, fmt.Errorf("amdxdna power mode: short response (%d)", len(payload))
-	}
-	pm := (*amdxdnaDrmPowerMode)(unsafe.Pointer(&payload[0]))
-	return int(pm.mode), nil
-}
-
-// SetNPUPowerMode sets the NPU DPM power mode. The mode is volatile — it
-// resets to DEFAULT on sleep/shutdown; the daemon does not persist it.
-//
-// NOTE: the amdxdna driver marks SET_STATE as DRM_ROOT_ONLY, so this returns
-// EACCES unless the caller has CAP_SYS_ADMIN (root or setcap'd binary).
-// Also, only DEFAULT (0), HIGH (3), and TURBO (4) are implemented by the
-// driver — LOW (1) and MEDIUM (2) return EOPNOTSUPP (see aie2_pm.c:111).
-func SetNPUPowerMode(mode int) error {
-	switch mode {
-	case NPUPowerModeDefault, NPUPowerModeHigh, NPUPowerModeTurbo:
-		// ok
-	default:
-		return fmt.Errorf("power mode %d not supported by amdxdna driver (only DEFAULT, HIGH, TURBO)", mode)
-	}
-	path := findNPUDevice()
-	if path == "" {
-		return fmt.Errorf("amdxdna NPU not found")
-	}
-	f, err := os.OpenFile(path, os.O_RDWR, 0)
-	if err != nil {
-		return err
-	}
-	defer f.Close()
-
-	payload := amdxdnaDrmPowerMode{mode: uint8(mode)}
-	req := amdxdnaDrmGetInfo{
-		param:      drmAmdxdnaSetPowerMode,
-		bufferSize: amdxdnaPowerModeSz,
-		buffer:     unsafe.Pointer(&payload),
-	}
-	_, _, errno := syscall.Syscall(
-		syscall.SYS_IOCTL, f.Fd(),
-		uintptr(amdxdnaIoctlSetState),
-		uintptr(unsafe.Pointer(&req)),
-	)
-	runtime.KeepAlive(payload)
-	if errno != 0 {
-		return fmt.Errorf("amdxdna set power mode: %w", errno)
-	}
-	return nil
-}
-
-// NPUPowerModeName returns a lowercase human-readable name for a power mode.
-func NPUPowerModeName(mode int) string {
-	switch mode {
-	case NPUPowerModeDefault:
-		return "default"
-	case NPUPowerModeLow:
-		return "low"
-	case NPUPowerModeMedium:
-		return "medium"
-	case NPUPowerModeHigh:
-		return "high"
-	case NPUPowerModeTurbo:
-		return "turbo"
-	default:
-		return fmt.Sprintf("unknown(%d)", mode)
-	}
-}
-
-// NPUPowerModeFromString parses a power mode by name or numeric string.
-// Returns (mode, true) on success, (0, false) if the input is unrecognized
-// or unsupported.
-//
-// Only DEFAULT (0), HIGH (3), and TURBO (4) are exposed. The uAPI defines
-// LOW (1) and MEDIUM (2) but the amdxdna driver returns -EOPNOTSUPP for
-// them (aie2_pm.c:111 default case), so we reject them here rather than
-// surface a confusing kernel error. Matching is case-insensitive.
-func NPUPowerModeFromString(s string) (int, bool) {
-	switch strings.ToLower(strings.TrimSpace(s)) {
-	case "default", "def", "0":
-		return NPUPowerModeDefault, true
-	case "high", "3":
-		return NPUPowerModeHigh, true
-	case "turbo", "4":
-		return NPUPowerModeTurbo, true
-	default:
-		return 0, false
-	}
 }

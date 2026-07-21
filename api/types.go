@@ -20,7 +20,6 @@ type State struct {
 	CPUPower           *CPUPowerState           `json:"cpu_power,omitempty"`
 	RefreshRate        int                      `json:"refresh_rate,omitempty"` // eDP-1 refresh rate in Hz (0 = unknown)
 	BatteryDetail      *BatteryState            `json:"battery_detail,omitempty"`
-	NPUPowerMode       int                      `json:"npu_power_mode,omitempty"` // amdxdna DPM mode 0-4 (omitted at 0=DEFAULT)
 	Temperature        int `json:"temperature,omitempty"` // APU temp, degrees Celsius (legacy; also in Telemetry)
 	FanRPM             int `json:"fan_rpm,omitempty"`     // fan1 speed in RPM (legacy; also in Telemetry)
 	Telemetry          *TelemetryState `json:"telemetry,omitempty"` // live sensor readings

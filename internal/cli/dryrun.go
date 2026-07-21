@@ -118,13 +118,6 @@ func DryRunPanelOverdrive(value int) {
 	fmt.Printf("Would write %d to %s\n", value, FindPanelOverdrivePath())
 }
 
-// DryRunNPUPowerMode prints the amdxdna DRM ioctl that would be performed.
-func DryRunNPUPowerMode(mode int) {
-	fmt.Println("=== DRY RUN (no DRM ioctl) ===")
-	fmt.Printf("Would set NPU power mode to %d (%s) via DRM_AMDXDNA_SET_STATE\n",
-		mode, NPUPowerModeName(mode))
-}
-
 // DryRunFanCurve prints the sysfs writes for a fan curve set operation.
 // The same curve is written to both fans.
 func DryRunFanCurve(points []api.FanCurvePoint) {
