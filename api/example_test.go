@@ -160,6 +160,34 @@ func ExampleSendPanelOverdriveGet() {
 	fmt.Println("panel overdrive:", value)
 }
 
+func ExampleSendNPUPowerModeSet() {
+	// Set the NPU to maximum power (TURBO DPM).
+	handled, err := api.SendNPUPowerModeSet(4) // 4 = NPUPowerModeTurbo
+	if !handled {
+		fmt.Println("daemon not running")
+		return
+	}
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println("npu power mode set")
+}
+
+func ExampleSendNPUPowerModeGet() {
+	// Read the current NPU DPM power mode (0=DEFAULT .. 4=TURBO).
+	handled, value, err := api.SendNPUPowerModeGet()
+	if !handled {
+		fmt.Println("daemon not running")
+		return
+	}
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println("npu power mode:", value)
+}
+
 func ExampleSendFanCurveGet() {
 	// Read the current fan curve for both fans via the daemon.
 	handled, value, err := api.SendFanCurveGet()

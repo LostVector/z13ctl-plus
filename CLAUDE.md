@@ -204,6 +204,16 @@ contrib/
   `status` command and in the daemon's `get-state` response. Column
   utilization and power sensors are gated by driver version; older `amdxdna`
   stacks may return power only.
+- **NPU power mode (`z13ctl npu --set turbo`)**: the same `internal/cli/npu.go`
+  also gets/sets the NPU DPM power mode (DEFAULT/LOW/MEDIUM/HIGH/TURBO) via
+  `DRM_AMDXDNA_GET_POWER_MODE` (param 9) and `DRM_AMDXDNA_SET_STATE` with
+  `DRM_AMDXDNA_SET_POWER_MODE`. The mode is volatile — it resets on sleep and
+  the daemon does not persist it. **Important**: the driver marks SET_STATE
+  as `DRM_ROOT_ONLY` in its ioctl table (`amdxdna_pci_drv.c`), so `--set`
+  requires `CAP_SYS_ADMIN` (root via sudo, or `setcap cap_sys_admin+ep` on
+  the binary). udev rules cannot grant this — it is enforced inside DRM core,
+  not via file permissions. `--get` is unprivileged. Daemon handler also
+  requires the daemon itself to run as root to actually mutate the mode.
 - **Sleep/resume hook**: `internal/daemon/resume.go` watches for DBus
   `org.freedesktop.login1.Manager.PrepareForSleep` signals. On sleep
   (`PrepareForSleep(true)`), turns off the lightbar via `aura.TurnOff()` (the
