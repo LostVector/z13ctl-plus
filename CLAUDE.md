@@ -229,6 +229,13 @@ contrib/
   Net effect on Strix Halo: all three working modes run at the same npuclk
   (1267 MHz) — the DPM table has 8 levels (396-1267 MHz) but the power_mode
   interface doesn't expose them.
+  **Empirically (Qwen3-0.6B sustained generation, 12 samples per mode)**:
+  default=2.14W, high=2.16W, turbo=2.16W — within 20mW of each other, well
+  below sensor noise. TURBO's clk_gating-off setting provides no measurable
+  benefit for sustained workloads because there are no idle blocks to gate
+  when the NPU is continuously busy. DEFAULT is the right choice for normal
+  use; TURBO's only real value is for short bursty workloads with idle gaps
+  where clk_gating wake-up latency could matter (not measured here).
 - **Sleep/resume hook**: `internal/daemon/resume.go` watches for DBus
   `org.freedesktop.login1.Manager.PrepareForSleep` signals. On sleep
   (`PrepareForSleep(true)`), turns off the lightbar via `aura.TurnOff()` (the
