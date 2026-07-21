@@ -193,9 +193,9 @@ contrib/
   is present.
 - **NPU telemetry (amdxdna DRM ioctl)**: `internal/cli/npu.go` reads power (W)
   and per-column utilization (%) via `DRM_AMDXDNA_QUERY_SENSORS`, plus the
-  MP-NPU clock via `DRM_AMDXDNA_QUERY_CLOCK_METADATA`. These are
-  hardware-backed sensors (not derived submission-counter deltas), exposed by
-  the `amdxdna` driver (mainline since Linux 6.19; `amdxdna-dkms` 7.0+ on
+  current MP-NPU clock (npuclk) via `DRM_AMDXDNA_QUERY_CLOCK_METADATA`. These
+  are hardware-backed sensors (not derived submission-counter deltas), exposed
+  by the `amdxdna` driver (mainline since Linux 6.19; `amdxdna-dkms` 7.0+ on
   older kernels). Unlike the amdgpu/iGPU readers which use sysfs, the NPU
   readers issue ioctls on `/dev/accel/accelN` (discovered via
   `/sys/class/accel/accel*/device/vendor == 0x1022`). Multiple column sensors
@@ -204,6 +204,12 @@ contrib/
   `status` command and in the daemon's `get-state` response. Column
   utilization and power sensors are gated by driver version; older `amdxdna`
   stacks may return power only.
+  **Note on `NPUClockMHz`**: the value is *live* (driver source: `mp_npu_clock.
+  freq_mhz = ndev->npuclk_freq`, updated on every DPM switch via
+  `aie2_smu.c:114`). In practice on Strix Halo it appears static at 1267 MHz
+  because the driver pins DPM at max whenever any process holds the device
+  open — but it is not metadata. Older `amdxdna` versions (pre-7.0) may not
+  update `npuclk_freq` and would report a fixed value.
 - **NPU power mode (`z13ctl npu --set turbo`)**: the same `internal/cli/npu.go`
   also gets/sets the NPU DPM power mode (DEFAULT/LOW/MEDIUM/HIGH/TURBO) via
   `DRM_AMDXDNA_GET_POWER_MODE` (param 9) and `DRM_AMDXDNA_SET_STATE` with

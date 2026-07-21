@@ -216,8 +216,12 @@ func ReadNPUSensors() (powerW, utilPct int, err error) {
 	return powerW, utilPct, nil
 }
 
-// ReadNPUClockMHz returns the current MP-NPU clock in MHz, or (0, err) if the
-// NPU or clock query is unavailable.
+// ReadNPUClockMHz returns the current MP-NPU clock (npuclk) in MHz, or
+// (0, err) if the NPU or clock query is unavailable. This is the live npuclk
+// from the current DPM level (driver updates ndev->npuclk_freq on every DPM
+// switch — see aie2_smu.c). In practice on Strix Halo the driver pins DPM
+// at max (1267 MHz) whenever any process holds /dev/accel/accelN open, so
+// the value may appear static — but it is not metadata.
 func ReadNPUClockMHz() (int, error) {
 	payload, err := npuQuery(drmAmdxdnaQueryClockMetadata, amdxdnaClockMDSize)
 	if err != nil {
