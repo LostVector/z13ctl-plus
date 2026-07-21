@@ -216,9 +216,10 @@ func ReadNPUSensors() (powerW, utilPct int, err error) {
 	return powerW, utilPct, nil
 }
 
-// ReadNPUClockMHz returns the current MP-NPU clock in MHz, or (0, err) if the
-// NPU or clock query is unavailable.
-func ReadNPUClockMHz() (int, error) {
+// ReadNPUMaxClockMHz returns the MP-NPU max clock (static metadata) in MHz,
+// or (0, err) if the NPU or clock query is unavailable. This is the driver's
+// advertised max frequency, not a live DPM state.
+func ReadNPUMaxClockMHz() (int, error) {
 	payload, err := npuQuery(drmAmdxdnaQueryClockMetadata, amdxdnaClockMDSize)
 	if err != nil {
 		return 0, err

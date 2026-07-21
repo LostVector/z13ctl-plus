@@ -313,8 +313,8 @@ func ReadTelemetry() *api.TelemetryState {
 		t.NPUPowerW = power
 		t.NPUUtil = util
 	}
-	if v, err := ReadNPUClockMHz(); err == nil {
-		t.NPUClockMHz = v
+	if v, err := ReadNPUMaxClockMHz(); err == nil {
+		t.NPUMaxClockMHz = v
 	}
 	if v, err := ReadCPUClockMHz(); err == nil {
 		t.CPUClockMHz = v

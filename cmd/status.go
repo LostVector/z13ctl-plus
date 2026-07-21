@@ -87,8 +87,8 @@ func runStatus() error {
 	fmt.Println("Telemetry:")
 	fmt.Printf("  CPU:    %d°C, %d%%, %s, %d RPM\n", t.CPUTemp, t.CPUUtil, formatClock(t.CPUClockMHz), t.CPUFanRPM)
 	fmt.Printf("  GPU:    %d°C, %d%%, %s, %d RPM\n", t.GPUTemp, t.GPUUtil, formatClock(t.GPUClockMHz), t.GPUFanRPM)
-	if t.NPUUtil != 0 || t.NPUPowerW != 0 || t.NPUClockMHz != 0 {
-		fmt.Printf("  NPU:    %d%%, %dW, %s\n", t.NPUUtil, t.NPUPowerW, formatClock(t.NPUClockMHz))
+	if t.NPUUtil != 0 || t.NPUPowerW != 0 || t.NPUMaxClockMHz != 0 {
+		fmt.Printf("  NPU:    %d%%, %dW, %s max\n", t.NPUUtil, t.NPUPowerW, formatClock(t.NPUMaxClockMHz))
 	}
 	fmt.Printf("  VRAM:   %d / %d MB\n", t.VRAMUsedMB, t.VRAMTotalMB)
 	fmt.Printf("  Memory: %d MT/s\n", t.MemClockMTs)
