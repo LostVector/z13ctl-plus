@@ -88,7 +88,7 @@ func runStatus() error {
 	fmt.Printf("  CPU:    %d°C, %d%%, %s, %d RPM\n", t.CPUTemp, t.CPUUtil, formatClock(t.CPUClockMHz), t.CPUFanRPM)
 	fmt.Printf("  GPU:    %d°C, %d%%, %s, %d RPM\n", t.GPUTemp, t.GPUUtil, formatClock(t.GPUClockMHz), t.GPUFanRPM)
 	if t.NPUUtil != 0 || t.NPUPowerW != 0 || t.NPUClockMHz != 0 {
-		fmt.Printf("  NPU:    %d%%, %dW, %s\n", t.NPUUtil, t.NPUPowerW, formatClock(t.NPUClockMHz))
+		fmt.Printf("  NPU:    %d%%, %.2fW, %s\n", t.NPUUtil, t.NPUPowerW, formatClock(t.NPUClockMHz))
 	}
 	fmt.Printf("  VRAM:   %d / %d MB\n", t.VRAMUsedMB, t.VRAMTotalMB)
 	fmt.Printf("  Memory: %d MT/s\n", t.MemClockMTs)

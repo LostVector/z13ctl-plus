@@ -47,9 +47,9 @@ type TelemetryState struct {
 	GPUFanRPM   int `json:"gpu_fan_rpm,omitempty"`   // fan2_input (GPU-side heatsink)
 	CPUUtil     int `json:"cpu_util,omitempty"`      // 0–100, /proc/stat jiffie delta
 	GPUUtil     int `json:"gpu_util,omitempty"`      // 0–100, amdgpu gpu_busy_percent
-	NPUUtil     int `json:"npu_util,omitempty"`      // 0–100, amdxdna column utilization (avg)
-	NPUPowerW   int `json:"npu_power_w,omitempty"`   // amdxdna NPU power draw, W
-	NPUClockMHz int `json:"npu_clock_mhz,omitempty"` // amdxdna live npuclk from current DPM level
+	NPUUtil     int     `json:"npu_util,omitempty"`      // 0–100, amdxdna column utilization (avg)
+	NPUPowerW   float64 `json:"npu_power_w,omitempty"`   // amdxdna NPU power draw, W (decimal, e.g. 1.85)
+	NPUClockMHz int     `json:"npu_clock_mhz,omitempty"` // amdxdna live npuclk from current DPM level
 	CPUClockMHz int `json:"cpu_clock_mhz,omitempty"` // average scaling_cur_freq across cores
 	GPUClockMHz int `json:"gpu_clock_mhz,omitempty"` // amdgpu freq1_input (sclk) or pp_dpm_sclk active
 	VRAMUsedMB  int `json:"vram_used_mb,omitempty"`  // amdgpu mem_info_vram_used

@@ -181,14 +181,14 @@ func npuQuery(param uint32, minBytes int) ([]byte, error) {
 	return nil, fmt.Errorf("amdxdna ioctl %d: buffer retry exhausted", param)
 }
 
-// ReadNPUSensors returns the NPU power draw (W) and the average per-column
-// utilization (0–100). Returns (0, 0, err) when the NPU or sensors are
-// unavailable. Multiple column-utilization sensors (Strix Halo exposes one
+// ReadNPUSensors returns the NPU power draw (W, decimal) and the average
+// per-column utilization (0–100). Returns (0, 0, err) when the NPU or sensors
+// are unavailable. Multiple column-utilization sensors (Strix Halo exposes one
 // per AIE column) are averaged to a single busy percentage.
 //
-// Power unit handling: the driver may report in mW (unitm < 0 or units
-// string prefixed with "m"); we convert to W.
-func ReadNPUSensors() (powerW, utilPct int, err error) {
+// Power is reported with sub-watt precision (the driver exposes mW); useful
+// for comparing power modes under the same workload.
+func ReadNPUSensors() (powerW float64, utilPct int, err error) {
 	payload, err := npuQuery(drmAmdxdnaQuerySensors, 0)
 	if err != nil {
 		return 0, 0, err
@@ -198,10 +198,10 @@ func ReadNPUSensors() (powerW, utilPct int, err error) {
 		s := (*amdxdnaQuerySensor)(unsafe.Pointer(&payload[off]))
 		switch s.typ {
 		case amdxdnaSensorPower:
-			v := int(s.input)
+			v := float64(s.input)
 			units := strings.ToLower(strings.TrimSpace(string(s.units[:])))
 			if s.unitm < 0 || strings.HasPrefix(units, "m") {
-				v /= 1000
+				v /= 1000.0
 			}
 			powerW = v
 		case amdxdnaSensorColumnUtilization:
