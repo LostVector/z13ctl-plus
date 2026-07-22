@@ -39,3 +39,18 @@ func TestParseGPUCurrentUClockMHzRejectsUnsupportedRevision(t *testing.T) {
 		t.Fatal("parseGPUCurrentUClockMHz() accepted unsupported revision")
 	}
 }
+
+func TestParseGPUPowerW(t *testing.T) {
+	data := make([]byte, 264)
+	binary.LittleEndian.PutUint16(data[:2], uint16(len(data)))
+	data[2], data[3] = 3, 0
+	binary.LittleEndian.PutUint32(data[124:128], 5123)
+
+	got, err := parseGPUPowerW(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 5.123 {
+		t.Fatalf("parseGPUPowerW() = %v, want 5.123", got)
+	}
+}

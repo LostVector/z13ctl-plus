@@ -60,6 +60,8 @@ type TelemetryState struct {
 	GPUClockMHz       int     `json:"gpu_clock_mhz,omitempty"`       // amdgpu freq1_input (sclk) or pp_dpm_sclk active
 	APUPowerW         float64 `json:"apu_power_w,omitempty"`         // amdgpu PPT package power, W
 	APUPowerAvailable bool    `json:"apu_power_available,omitempty"` // true when amdgpu power telemetry was read
+	GPUPowerW         float64 `json:"gpu_power_w,omitempty"`         // amdgpu gpu_metrics GFX domain power, W
+	GPUPowerAvailable bool    `json:"gpu_power_available,omitempty"` // true when gpu_metrics exposed GFX power
 	VRAMUsedMB        int     `json:"vram_used_mb,omitempty"`        // amdgpu mem_info_vram_used
 	VRAMTotalMB       int     `json:"vram_total_mb,omitempty"`       // amdgpu mem_info_vram_total
 	MemoryUsedMB      int     `json:"memory_used_mb,omitempty"`      // MemTotal - MemAvailable

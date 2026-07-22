@@ -90,6 +90,9 @@ func runStatus() error {
 	if t.APUPowerAvailable {
 		fmt.Printf("  APU:    %.1f W PPT\n", t.APUPowerW)
 	}
+	if t.GPUPowerAvailable {
+		fmt.Printf("  GPU:    %.1f W GFX\n", t.GPUPowerW)
+	}
 	if t.NPUUtil != 0 || t.NPUPowerW != 0 || t.NPUClockMHz != 0 {
 		fmt.Printf("  NPU:    %d%%, %.2fW, %s\n", t.NPUUtil, t.NPUPowerW, formatClock(t.NPUClockMHz))
 	}

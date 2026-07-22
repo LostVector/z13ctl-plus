@@ -118,6 +118,38 @@ func ReadAPUPowerW() (float64, error) {
 	return float64(microwatts) / 1_000_000, nil
 }
 
+// ReadGPUPowerW returns the time-filtered GFX domain power in watts.
+func ReadGPUPowerW() (float64, error) {
+	dev := findGPUDevicePath()
+	if dev == "" {
+		return 0, fmt.Errorf("amdgpu device not found")
+	}
+	data, err := os.ReadFile(dev + "/gpu_metrics")
+	if err != nil {
+		return 0, err
+	}
+	return parseGPUPowerW(data)
+}
+
+func parseGPUPowerW(data []byte) (float64, error) {
+	// gpu_metrics_v3_0 average_gfx_power is a uint32 at byte offset 124 in mW.
+	const gfxPowerOffset = 124
+	if len(data) < gfxPowerOffset+4 {
+		return 0, fmt.Errorf("gpu_metrics table too short: %d", len(data))
+	}
+	if data[2] != 3 || data[3] != 0 {
+		return 0, fmt.Errorf("unsupported gpu_metrics revision %d.%d", data[2], data[3])
+	}
+	if size := int(binary.LittleEndian.Uint16(data[:2])); size < gfxPowerOffset+4 || size > len(data) {
+		return 0, fmt.Errorf("invalid gpu_metrics table size: %d", size)
+	}
+	mw := binary.LittleEndian.Uint32(data[gfxPowerOffset : gfxPowerOffset+4])
+	if mw == 0xffffffff {
+		return 0, fmt.Errorf("gpu_metrics GFX power unavailable")
+	}
+	return float64(mw) / 1000, nil
+}
+
 // ReadVRAM returns the iGPU VRAM usage in MB. On Strix Halo's unified memory
 // architecture, "VRAM" is the carved-out portion of system RAM reserved for
 // the iGPU. total is the carveout size; used is how much of it is in use.
@@ -398,6 +430,10 @@ func ReadTelemetry() *api.TelemetryState {
 	if v, err := ReadAPUPowerW(); err == nil {
 		t.APUPowerW = v
 		t.APUPowerAvailable = true
+	}
+	if v, err := ReadGPUPowerW(); err == nil {
+		t.GPUPowerW = v
+		t.GPUPowerAvailable = true
 	}
 	if used, total, err := ReadVRAM(); err == nil {
 		t.VRAMUsedMB = used
