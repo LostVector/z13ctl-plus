@@ -41,26 +41,31 @@ type State struct {
 // calls, so the first call after daemon start may report 0. Subsequent calls
 // reflect the utilisation over the interval since the previous call.
 //
-// Fields are reported as 0 (zero value) when the underlying sensor is
-// unavailable, not as -1, so callers can do simple presence checks via the
-// parent State.Telemetry == nil.
+// Numeric fields use zero when unavailable. Availability flags distinguish
+// sensors where zero is also a valid live value, such as stopped fans or an
+// idle NPU.
 type TelemetryState struct {
-	CPUTemp       int     `json:"cpu_temp,omitempty"`        // APU die temp, °C (k10temp Tctl)
-	GPUTemp       int     `json:"gpu_temp,omitempty"`        // iGPU edge temp, °C (amdgpu temp1)
-	CPUFanRPM     int     `json:"cpu_fan_rpm,omitempty"`     // fan1_input (CPU-side heatsink)
-	GPUFanRPM     int     `json:"gpu_fan_rpm,omitempty"`     // fan2_input (GPU-side heatsink)
-	CPUUtil       int     `json:"cpu_util,omitempty"`        // 0–100, /proc/stat jiffie delta
-	GPUUtil       int     `json:"gpu_util,omitempty"`        // 0–100, amdgpu gpu_busy_percent
-	NPUUtil       int     `json:"npu_util,omitempty"`        // 0–100, amdxdna column utilization (avg)
-	NPUPowerW     float64 `json:"npu_power_w,omitempty"`     // amdxdna NPU power draw, W (decimal, e.g. 1.85)
-	NPUClockMHz   int     `json:"npu_clock_mhz,omitempty"`   // amdxdna live npuclk from current DPM level
-	CPUClockMHz   int     `json:"cpu_clock_mhz,omitempty"`   // average scaling_cur_freq across cores
-	GPUClockMHz   int     `json:"gpu_clock_mhz,omitempty"`   // amdgpu freq1_input (sclk) or pp_dpm_sclk active
-	VRAMUsedMB    int     `json:"vram_used_mb,omitempty"`    // amdgpu mem_info_vram_used
-	VRAMTotalMB   int     `json:"vram_total_mb,omitempty"`   // amdgpu mem_info_vram_total
-	MemoryUsedMB  int     `json:"memory_used_mb,omitempty"`  // MemTotal - MemAvailable
-	MemoryTotalMB int     `json:"memory_total_mb,omitempty"` // Linux MemTotal
-	MemClockMTs   int     `json:"mem_clock_mts,omitempty"`   // amdgpu mem_info_freq (mclk) in MT/s
+	CPUTemp           int     `json:"cpu_temp,omitempty"`            // APU die temp, °C (k10temp Tctl)
+	GPUTemp           int     `json:"gpu_temp,omitempty"`            // iGPU edge temp, °C (amdgpu temp1)
+	CPUFanRPM         int     `json:"cpu_fan_rpm,omitempty"`         // fan1_input (CPU-side heatsink)
+	GPUFanRPM         int     `json:"gpu_fan_rpm,omitempty"`         // fan2_input (GPU-side heatsink)
+	FansAvailable     bool    `json:"fans_available,omitempty"`      // true when both fan sensors were read
+	CPUUtil           int     `json:"cpu_util,omitempty"`            // 0–100, /proc/stat jiffie delta
+	GPUUtil           int     `json:"gpu_util,omitempty"`            // 0–100, amdgpu gpu_busy_percent
+	NPUUtil           int     `json:"npu_util,omitempty"`            // 0–100, amdxdna column utilization (avg)
+	NPUPowerW         float64 `json:"npu_power_w,omitempty"`         // amdxdna NPU power draw, W (decimal, e.g. 1.85)
+	NPUClockMHz       int     `json:"npu_clock_mhz,omitempty"`       // amdxdna live npuclk from current DPM level
+	NPUAvailable      bool    `json:"npu_available,omitempty"`       // true when amdxdna telemetry was read
+	CPUClockMHz       int     `json:"cpu_clock_mhz,omitempty"`       // average scaling_cur_freq across cores
+	GPUClockMHz       int     `json:"gpu_clock_mhz,omitempty"`       // amdgpu freq1_input (sclk) or pp_dpm_sclk active
+	APUPowerW         float64 `json:"apu_power_w,omitempty"`         // amdgpu PPT package power, W
+	APUPowerAvailable bool    `json:"apu_power_available,omitempty"` // true when amdgpu power telemetry was read
+	VRAMUsedMB        int     `json:"vram_used_mb,omitempty"`        // amdgpu mem_info_vram_used
+	VRAMTotalMB       int     `json:"vram_total_mb,omitempty"`       // amdgpu mem_info_vram_total
+	MemoryUsedMB      int     `json:"memory_used_mb,omitempty"`      // MemTotal - MemAvailable
+	MemoryTotalMB     int     `json:"memory_total_mb,omitempty"`     // Linux MemTotal
+	MemClockMHz       int     `json:"mem_clock_mhz,omitempty"`       // amdgpu gpu_metrics time-filtered UCLK
+	MemClockAvailable bool    `json:"mem_clock_available,omitempty"` // true when gpu_metrics exposed UCLK
 }
 
 // BatteryState captures live battery telemetry from power_supply sysfs.

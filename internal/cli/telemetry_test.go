@@ -1,6 +1,9 @@
 package cli
 
-import "testing"
+import (
+	"encoding/binary"
+	"testing"
+)
 
 func TestReadMemory(t *testing.T) {
 	used, total, err := ReadMemory()
@@ -9,5 +12,30 @@ func TestReadMemory(t *testing.T) {
 	}
 	if total <= 0 || used < 0 || used > total {
 		t.Fatalf("invalid memory usage: %d / %d MiB", used, total)
+	}
+}
+
+func TestParseGPUCurrentUClockMHz(t *testing.T) {
+	data := make([]byte, 264)
+	binary.LittleEndian.PutUint16(data[:2], uint16(len(data)))
+	data[2], data[3] = 3, 0
+	binary.LittleEndian.PutUint16(data[186:188], 425)
+
+	got, err := parseGPUCurrentUClockMHz(data)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != 425 {
+		t.Fatalf("parseGPUCurrentUClockMHz() = %d, want 425", got)
+	}
+}
+
+func TestParseGPUCurrentUClockMHzRejectsUnsupportedRevision(t *testing.T) {
+	data := make([]byte, 264)
+	binary.LittleEndian.PutUint16(data[:2], uint16(len(data)))
+	data[2], data[3] = 2, 4
+
+	if _, err := parseGPUCurrentUClockMHz(data); err == nil {
+		t.Fatal("parseGPUCurrentUClockMHz() accepted unsupported revision")
 	}
 }

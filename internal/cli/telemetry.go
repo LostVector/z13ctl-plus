@@ -7,7 +7,7 @@ package cli
 //
 // GPU side: amdgpu driver sysfs. The drm card path is discovered once and
 // cached; amdgpu exposes gpu_busy_percent, freq1_input (sclk),
-// mem_info_vram_{used,total}, and mem_info_freq (mclk) on the device node.
+// mem_info_vram_{used,total}, and gpu_metrics on the device node.
 // GPU edge temp comes from the amdgpu hwmon entry, which is looked up by
 // hwmon name "amdgpu" via the existing FindFanHwmonPath helper.
 //
@@ -17,6 +17,7 @@ package cli
 
 import (
 	"bufio"
+	"encoding/binary"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -101,6 +102,22 @@ func ReadGPUClockMHz() (int, error) {
 	return readCurrentDpmClock(dev + "/pp_dpm_sclk")
 }
 
+// ReadAPUPowerW returns amdgpu's live PPT package power in watts.
+func ReadAPUPowerW() (float64, error) {
+	dir := FindFanHwmonPath("amdgpu")
+	if dir == "" {
+		return 0, fmt.Errorf("amdgpu hwmon not found")
+	}
+	microwatts, err := readIntFile(dir + "/power1_average")
+	if err != nil {
+		microwatts, err = readIntFile(dir + "/power1_input")
+	}
+	if err != nil {
+		return 0, err
+	}
+	return float64(microwatts) / 1_000_000, nil
+}
+
 // ReadVRAM returns the iGPU VRAM usage in MB. On Strix Halo's unified memory
 // architecture, "VRAM" is the carved-out portion of system RAM reserved for
 // the iGPU. total is the carveout size; used is how much of it is in use.
@@ -161,24 +178,38 @@ func ReadMemory() (used, total int, err error) {
 	return (totalKB - availableKB) / 1024, totalKB / 1024, nil
 }
 
-// ReadMemClockMTs returns the iGPU memory clock in MT/s (mega-transfers/sec).
-// Tries amdgpu's mem_info_freq first (discrete GPUs, already in MT/s); falls
-// back to parsing pp_dpm_mclk on APUs where mem_info_freq is absent. The
-// pp_dpm_mclk value is in MHz; we convert to MT/s by doubling (double data
-// rate). Returns 0 if neither source is readable.
-func ReadMemClockMTs() (int, error) {
+// ReadMemClockMHz returns the live, time-filtered UCLK from Strix Halo's
+// amdgpu gpu_metrics v3.0 table.
+func ReadMemClockMHz() (int, error) {
 	dev := findGPUDevicePath()
 	if dev == "" {
 		return 0, fmt.Errorf("amdgpu device not found")
 	}
-	if v, err := readIntFile(dev + "/mem_info_freq"); err == nil {
-		return v, nil
-	}
-	mhz, err := readCurrentDpmClock(dev + "/pp_dpm_mclk")
+	data, err := os.ReadFile(dev + "/gpu_metrics")
 	if err != nil {
 		return 0, err
 	}
-	return mhz * 2, nil // MHz → MT/s (double data rate)
+	return parseGPUCurrentUClockMHz(data)
+}
+
+func parseGPUCurrentUClockMHz(data []byte) (int, error) {
+	// gpu_metrics_v3_0 is 264 bytes; average_uclk_frequency is a uint16 at
+	// byte offset 186. It is a live time-filtered clock in MHz.
+	const uclkOffset = 186
+	if len(data) < uclkOffset+2 {
+		return 0, fmt.Errorf("gpu_metrics table too short: %d", len(data))
+	}
+	if data[2] != 3 || data[3] != 0 {
+		return 0, fmt.Errorf("unsupported gpu_metrics revision %d.%d", data[2], data[3])
+	}
+	if size := int(binary.LittleEndian.Uint16(data[:2])); size < uclkOffset+2 || size > len(data) {
+		return 0, fmt.Errorf("invalid gpu_metrics table size: %d", size)
+	}
+	mhz := int(binary.LittleEndian.Uint16(data[uclkOffset : uclkOffset+2]))
+	if mhz == 0 || mhz == 0xffff {
+		return 0, fmt.Errorf("gpu_metrics UCLK unavailable")
+	}
+	return mhz, nil
 }
 
 // readCurrentDpmClock parses an amdgpu pp_dpm_* file and returns the current
@@ -342,6 +373,7 @@ func ReadTelemetry() *api.TelemetryState {
 	if rpms, err := ReadBothFanRPM(); err == nil {
 		t.CPUFanRPM = rpms[0]
 		t.GPUFanRPM = rpms[1]
+		t.FansAvailable = true
 	}
 	if v, err := ReadCPUUtilization(); err == nil {
 		t.CPUUtil = v
@@ -352,6 +384,7 @@ func ReadTelemetry() *api.TelemetryState {
 	if power, util, err := ReadNPUSensors(); err == nil {
 		t.NPUPowerW = power
 		t.NPUUtil = util
+		t.NPUAvailable = true
 	}
 	if v, err := ReadNPUClockMHz(); err == nil {
 		t.NPUClockMHz = v
@@ -362,6 +395,10 @@ func ReadTelemetry() *api.TelemetryState {
 	if v, err := ReadGPUClockMHz(); err == nil {
 		t.GPUClockMHz = v
 	}
+	if v, err := ReadAPUPowerW(); err == nil {
+		t.APUPowerW = v
+		t.APUPowerAvailable = true
+	}
 	if used, total, err := ReadVRAM(); err == nil {
 		t.VRAMUsedMB = used
 		t.VRAMTotalMB = total
@@ -370,8 +407,9 @@ func ReadTelemetry() *api.TelemetryState {
 		t.MemoryUsedMB = used
 		t.MemoryTotalMB = total
 	}
-	if v, err := ReadMemClockMTs(); err == nil {
-		t.MemClockMTs = v
+	if v, err := ReadMemClockMHz(); err == nil {
+		t.MemClockMHz = v
+		t.MemClockAvailable = true
 	}
 	return t
 }
