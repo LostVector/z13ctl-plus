@@ -104,21 +104,13 @@ z13ctl profile [flags]
 | `--get` | Print the active performance profile |
 | `--set <profile>` | Set the performance profile |
 
-Valid profiles: `quiet`, `balanced`, `performance`, `custom`
-
-The `custom` profile is a virtual profile that recalls saved fan curves and TDP
-settings from the daemon's state file. It does **not** write to `platform_profile`.
-Setting `custom` requires the daemon to be running, and at least one custom fan
-curve or TDP value must have been previously set.
-
-Setting a stock profile (`quiet`, `balanced`, `performance`) resets any active
-custom fan curves and TDP values back to firmware defaults.
+Valid profiles: `quiet`, `balanced`, `performance`. Profile changes preserve and
+reapply active fan, TDP, and undervolt overrides when the daemon is running.
 
 ```sh
 z13ctl profile --get
 z13ctl profile --set performance
 z13ctl profile --set balanced
-z13ctl profile --set custom
 ```
 
 !!! note
@@ -130,7 +122,7 @@ z13ctl profile --set custom
 ## preset
 
 Save, apply, and automatically select named performance presets. Presets capture
-the logical profile, custom fan/TDP/undervolt settings, CPU minimum/EPP/boost,
+the physical profile, fan/TDP/undervolt overrides, CPU minimum/EPP/boost,
 panel overdrive, and display refresh rate. The daemon must be running.
 
 ```sh
@@ -138,17 +130,23 @@ z13ctl preset list
 z13ctl preset save Gaming
 z13ctl preset apply Gaming
 z13ctl preset delete Gaming
-z13ctl preset policy --enable --ac AC --battery Battery
+z13ctl preset restore-recommended
+z13ctl preset policy --enable --ac "Plugged In" --battery "On Battery"
 z13ctl preset policy --disable
 ```
 
-The first daemon start after upgrading creates two presets from the current
-machine state:
+The first daemon start on a fresh installation sets an 80% charge limit and
+creates two deterministic presets. Existing state files are migrated as needed
+but are never replaced by fresh defaults:
 
 | Preset | Defaults |
 |--------|----------|
-| `AC` | Current saved tuning with the display set to 180 Hz |
-| `Battery` | Quiet profile, minimum CPU frequency, `power` EPP, boost off, panel overdrive off, 60 Hz |
+| `Plugged In` | Balanced profile, hardware-minimum CPU frequency, `balance_performance` EPP, boost on, panel overdrive on, 180 Hz |
+| `On Battery` | Balanced profile, hardware-minimum CPU frequency, `balance_power` EPP, boost off, panel overdrive off, 60 Hz |
+
+`preset restore-recommended` creates or updates only these two presets, assigns
+them to AC and battery, and applies the preset for the current source. Other
+presets and the configured battery charge limit are preserved.
 
 Automatic switching runs in the user daemon, not a root udev rule. It changes
 the KDE display mode through KWin/KScreen and only acts at startup or an actual
@@ -330,9 +328,8 @@ and `--pl3` to set them independently — a stepped configuration like
 `--set 45 --pl2 55 --pl3 65` sustains 45W with short bursts to 55W and
 instantaneous peaks to 65W.
 
-Stock profiles (quiet/balanced/performance) let the firmware manage TDP
-dynamically — the firmware sets per-profile PPT values automatically on profile
-change. Setting a custom TDP switches to the `custom` profile.
+Without an active TDP override, the physical profile controls PPT dynamically.
+Setting TDP keeps that physical profile and activates an independent override.
 
 !!! note "PPT readback values"
     The values shown by `--get` are the kernel driver's cached values, which may
@@ -343,8 +340,9 @@ change. Setting a custom TDP switches to the `custom` profile.
 
 - Default range: 5–75W
 - `--force` extends the range to 5–93W
-- When any PPT value exceeds 75W, **both fans are forced to full speed** before
-  the TDP values are written. If the fan write fails, TDP is not applied.
+- When sustained PL1 exceeds 75W, both fans use a temporary 80%+ safety curve
+  before TDP is written. The desired custom curve, or auto mode, returns when
+  PL1 is safe again. If the fan write fails, TDP is not applied.
 
 ```sh
 # Read current TDP values
@@ -356,10 +354,10 @@ z13ctl tdp --set 50
 # Set with individual PL overrides
 z13ctl tdp --set 45 --pl2 55 --pl3 60
 
-# Force high TDP (fans will be set to full speed)
+# Force high TDP (fans use the temporary safety curve)
 z13ctl tdp --set 85 --force
 
-# Reset to balanced profile (firmware manages PPT)
+# Reset TDP to the current profile's firmware defaults
 z13ctl tdp --reset
 ```
 
@@ -382,13 +380,11 @@ z13ctl undervolt [flags]
 | `--set <value>` | Set all-core CPU CO offset (0 to -40) |
 | `--reset` | Reset CPU CO to stock (0) |
 
-CO values have no sysfs readback — `--get` returns the last-applied values from
-daemon state. If a stock profile is active (quiet/balanced/performance), the
-output indicates that the saved offsets are not currently applied. If the daemon
-is not running, reports "not set".
+CO values have no sysfs readback, so `--get` returns daemon state. Undervolt is
+an independent override and does not change the physical performance profile.
 
 CO is volatile: values reset on reboot and sleep/resume. The daemon reapplies
-them automatically on startup and resume when the custom profile is active.
+it automatically on startup and resume while the undervolt override is active.
 
 **Safety limits (matching G-Helper defaults):**
 

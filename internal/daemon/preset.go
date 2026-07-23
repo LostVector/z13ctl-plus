@@ -17,57 +17,114 @@ import (
 
 const powerPolicyPollInterval = 2 * time.Second
 
-func (d *Daemon) seedDefaultPresets() error {
-	d.mu.Lock()
-	configured := d.state.PowerPolicy != nil || len(d.state.Presets) != 0
-	d.mu.Unlock()
-	if configured {
+func (d *Daemon) seedDefaultPresets(fresh bool) error {
+	if !fresh {
 		return nil
 	}
 
-	ac := d.capturePreset()
-	ac.RefreshRate = 180
-
-	panelOff := 0
-	battery := api.Preset{
-		Profile:        "quiet",
-		RefreshRate:    60,
-		PanelOverdrive: &panelOff,
-	}
-	if cpu, err := cli.ReadCPUPower(); err == nil {
-		epp := cpu.EPP
-		for _, choice := range cpu.EPPChoices {
-			if choice == "power" {
-				epp = choice
-				break
-			}
-		}
-		battery.CPUPower = &api.CPUPowerPreset{
-			MinFrequencyKHz: cpu.MinLimitKHz,
-			EPP:             epp,
-			Boost:           false,
-		}
+	cpu, err := cli.ReadCPUPower()
+	if err != nil {
+		return fmt.Errorf("read CPU hardware limits: %w", err)
 	}
 
 	d.mu.Lock()
-	d.state.Presets = map[string]api.Preset{"AC": ac, "Battery": battery}
-	d.state.PowerPolicy = &api.PowerPolicy{
-		Enabled:       true,
-		ACPreset:      "AC",
-		BatteryPreset: "Battery",
-	}
+	setDefaultPowerConfiguration(&d.state, cpu.MinLimitKHz)
 	s := d.state
 	d.mu.Unlock()
 	return saveState(s)
 }
 
+func setDefaultPowerConfiguration(state *api.State, minFrequencyKHz int) {
+	state.Profile = "balanced"
+	state.Battery = 80
+	state.Presets = recommendedPresets(minFrequencyKHz)
+	state.PowerPolicy = recommendedPowerPolicy()
+}
+
+func recommendedPresets(minFrequencyKHz int) map[string]api.Preset {
+	panelOn, panelOff := 1, 0
+	return map[string]api.Preset{
+		"Plugged In": {
+			Profile:        "balanced",
+			RefreshRate:    180,
+			PanelOverdrive: &panelOn,
+			CPUPower: &api.CPUPowerPreset{
+				MinFrequencyKHz: minFrequencyKHz,
+				EPP:             "balance_performance",
+				Boost:           true,
+			},
+		},
+		"On Battery": {
+			Profile:        "balanced",
+			RefreshRate:    60,
+			PanelOverdrive: &panelOff,
+			CPUPower: &api.CPUPowerPreset{
+				MinFrequencyKHz: minFrequencyKHz,
+				EPP:             "balance_power",
+				Boost:           false,
+			},
+		},
+	}
+}
+
+func recommendedPowerPolicy() *api.PowerPolicy {
+	return &api.PowerPolicy{
+		Enabled:       true,
+		ACPreset:      "Plugged In",
+		BatteryPreset: "On Battery",
+	}
+}
+
+func restoreRecommendedPowerConfiguration(state *api.State, minFrequencyKHz int) {
+	presets := clonePresetMap(state.Presets)
+	if presets == nil {
+		presets = make(map[string]api.Preset)
+	}
+	for name, preset := range recommendedPresets(minFrequencyKHz) {
+		presets[name] = preset
+	}
+	state.Presets = presets
+	state.PowerPolicy = recommendedPowerPolicy()
+}
+
+func (d *Daemon) restoreRecommended() error {
+	cpu, err := cli.ReadCPUPower()
+	if err != nil {
+		return fmt.Errorf("read CPU hardware limits: %w", err)
+	}
+	source, err := cli.ReadPowerSource()
+	if err != nil {
+		return fmt.Errorf("read power source: %w", err)
+	}
+
+	d.mu.Lock()
+	restoreRecommendedPowerConfiguration(&d.state, cpu.MinLimitKHz)
+	d.powerSource = source
+	s := d.state
+	d.mu.Unlock()
+	if err := saveState(s); err != nil {
+		return err
+	}
+	name := "On Battery"
+	if source == cli.PowerSourceAC {
+		name = "Plugged In"
+	}
+	return d.applyPreset(name)
+}
+
 func (d *Daemon) capturePreset() api.Preset {
 	d.mu.Lock()
 	p := api.Preset{
-		Profile:   d.state.Profile,
-		FanCurve:  cloneFanCurve(d.state.FanCurve),
-		TDP:       cloneTDP(d.state.TDP),
-		Undervolt: cloneUndervolt(d.state.Undervolt),
+		Profile: d.state.Profile,
+	}
+	if d.state.FanCurveActive {
+		p.FanCurve = cloneFanCurve(d.state.FanCurve)
+	}
+	if d.state.TDPActive {
+		p.TDP = cloneTDP(d.state.TDP)
+	}
+	if d.state.UndervoltActive {
+		p.Undervolt = cloneUndervolt(d.state.Undervolt)
 	}
 	d.mu.Unlock()
 	if p.Undervolt != nil {
@@ -76,9 +133,6 @@ func (d *Daemon) capturePreset() api.Preset {
 
 	if p.Profile == "" {
 		p.Profile = readProfileFromSysfs()
-	}
-	if p.Profile == "custom" {
-		p.BaseProfile = readProfileFromSysfs()
 	}
 	if cpu, err := cli.ReadCPUPower(); err == nil {
 		p.CPUPower = &api.CPUPowerPreset{
@@ -141,7 +195,7 @@ func (d *Daemon) applyPreset(name string) error {
 
 	d.mu.Lock()
 	preset, ok := d.state.Presets[name]
-	activePreset := d.state.ActivePreset
+	next := d.state
 	d.mu.Unlock()
 	if !ok {
 		return fmt.Errorf("preset %q not found", name)
@@ -153,10 +207,20 @@ func (d *Daemon) applyPreset(name string) error {
 	if err := validatePresetHardware(preset); err != nil {
 		return fmt.Errorf("preset %q: %w", name, err)
 	}
-	if activePreset != name {
-		d.clearActivePreset()
+	next.Profile = preset.Profile
+	next.FanCurve = cloneFanCurve(preset.FanCurve)
+	next.TDP = cloneTDP(preset.TDP)
+	next.Undervolt = cloneUndervolt(preset.Undervolt)
+	next.FanCurveActive = preset.FanCurve != nil
+	next.TDPActive = preset.TDP != nil
+	next.UndervoltActive = preset.Undervolt != nil
+	if err := applyTuning(next, true); err != nil {
+		if profileAppliedBeforeError(err) {
+			_ = d.commitTuningState(next, "")
+		}
+		return err
 	}
-	if err := d.applyPresetProfile(preset); err != nil {
+	if err := d.commitTuningState(next, ""); err != nil {
 		return err
 	}
 	if cpu := preset.CPUPower; cpu != nil {
@@ -192,14 +256,6 @@ func (d *Daemon) applyPreset(name string) error {
 	}
 
 	d.mu.Lock()
-	d.state.Profile = preset.Profile
-	if preset.Profile == "custom" {
-		d.state.FanCurve = cloneFanCurve(preset.FanCurve)
-		d.state.TDP = cloneTDP(preset.TDP)
-		d.state.Undervolt = cloneUndervolt(preset.Undervolt)
-	} else if d.state.Undervolt != nil {
-		d.state.Undervolt.Active = false
-	}
 	if preset.PanelOverdrive != nil {
 		d.state.PanelOverdrive = *preset.PanelOverdrive
 	}
@@ -212,73 +268,6 @@ func (d *Daemon) applyPreset(name string) error {
 		return err
 	}
 	slog.Info("preset applied", "name", name)
-	return nil
-}
-
-func (d *Daemon) applyPresetProfile(preset api.Preset) error {
-	if preset.Profile == "custom" {
-		// Reset the underlying firmware-managed state first so fields omitted
-		// by this preset cannot leave stale PPT, fan, or CO values active.
-		base := preset.BaseProfile
-		if base == "" {
-			base = "balanced"
-		}
-		if err := cli.ResetAllFanCurves(); err != nil {
-			return fmt.Errorf("reset fan curve: %w", err)
-		}
-		if cli.SMUProbeUndervolt() {
-			if err := cli.ResetCurveOptimizer(); err != nil {
-				return fmt.Errorf("reset undervolt: %w", err)
-			}
-		}
-		if err := cli.SetProfile(base); err != nil {
-			return fmt.Errorf("reset firmware profile: %w", err)
-		}
-		if preset.TDP != nil && preset.TDP.PL1SPL > cli.TDPMaxSafe {
-			curve := cli.HighTDPFanCurve()
-			if preset.FanCurve != nil {
-				curve = preset.FanCurve.Points
-			}
-			if err := cli.SetBothFanCurves(curve); err != nil {
-				return fmt.Errorf("high-TDP fan curve: %w", err)
-			}
-		} else if preset.FanCurve != nil {
-			if err := cli.SetBothFanCurves(preset.FanCurve.Points); err != nil {
-				return fmt.Errorf("fan curve: %w", err)
-			}
-		}
-		if preset.TDP != nil {
-			if err := cli.SetTDP(0, preset.TDP.PL1SPL, preset.TDP.PL2SPPT, preset.TDP.FPPT); err != nil {
-				return fmt.Errorf("TDP: %w", err)
-			}
-		}
-		if preset.Undervolt != nil && cli.SMUProbeUndervolt() {
-			if err := cli.SetCurveOptimizer(preset.Undervolt.CPUCO); err != nil {
-				return fmt.Errorf("undervolt: %w", err)
-			}
-			preset.Undervolt.Active = true
-		}
-		return nil
-	}
-
-	d.mu.Lock()
-	wasCustom := d.state.Profile == "custom"
-	d.mu.Unlock()
-	if wasCustom {
-		if err := cli.ResetAllFanCurves(); err != nil {
-			slog.Warn("failed to reset fan curves for preset", "err", err)
-		}
-		if cli.SMUProbeUndervolt() {
-			if err := cli.ResetCurveOptimizer(); err != nil {
-				slog.Warn("failed to reset undervolt for preset", "err", err)
-			}
-		}
-	}
-	// Write even when the physical profile already has this name: leaving the
-	// virtual custom profile relies on this write to restore firmware PPT.
-	if err := cli.SetProfile(preset.Profile); err != nil {
-		return fmt.Errorf("profile: %w", err)
-	}
 	return nil
 }
 
@@ -301,13 +290,6 @@ func validatePresetName(name string) (string, error) {
 func validatePreset(p api.Preset) error {
 	switch p.Profile {
 	case "quiet", "balanced", "performance":
-	case "custom":
-		if p.FanCurve == nil && p.TDP == nil && p.Undervolt == nil {
-			return fmt.Errorf("custom profile has no custom settings")
-		}
-		if p.BaseProfile != "" && p.BaseProfile != "quiet" && p.BaseProfile != "balanced" && p.BaseProfile != "performance" {
-			return fmt.Errorf("invalid custom base profile %q", p.BaseProfile)
-		}
 	default:
 		return fmt.Errorf("invalid profile %q", p.Profile)
 	}
@@ -336,13 +318,6 @@ func validatePreset(p api.Preset) error {
 				return fmt.Errorf("TDP %dW out of range %d-%d", watts, cli.TDPMin, cli.TDPMaxForced)
 			}
 		}
-		if p.TDP.PL1SPL > cli.TDPMaxSafe && p.FanCurve != nil {
-			for _, point := range p.FanCurve.Points {
-				if point.PWM < cli.HighTDPMinPWM {
-					return fmt.Errorf("fan curve PWM must be at least %d above %dW", cli.HighTDPMinPWM, cli.TDPMaxSafe)
-				}
-			}
-		}
 	}
 	if p.Undervolt != nil {
 		if err := cli.ValidateCOValues(p.Undervolt.CPUCO); err != nil {
@@ -353,6 +328,9 @@ func validatePreset(p api.Preset) error {
 }
 
 func validatePresetHardware(p api.Preset) error {
+	if p.Undervolt != nil && !cli.SMUProbeUndervolt() {
+		return fmt.Errorf("undervolt unavailable: ryzen_smu is not loaded")
+	}
 	if p.CPUPower == nil {
 		return nil
 	}
@@ -437,37 +415,65 @@ func clonePowerPolicy(in *api.PowerPolicy) *api.PowerPolicy {
 
 func (d *Daemon) setPowerPolicy(enabled bool, acPreset, batteryPreset string) error {
 	d.mu.Lock()
-	defer d.mu.Unlock()
 	current := d.state.PowerPolicy
 	if acPreset == "" {
 		if current != nil {
 			acPreset = current.ACPreset
 		} else {
-			acPreset = "AC"
+			acPreset = "Plugged In"
 		}
 	}
 	if batteryPreset == "" {
 		if current != nil {
 			batteryPreset = current.BatteryPreset
 		} else {
-			batteryPreset = "Battery"
+			batteryPreset = "On Battery"
 		}
 	}
 	if _, ok := d.state.Presets[acPreset]; !ok {
+		d.mu.Unlock()
 		return fmt.Errorf("AC preset %q not found", acPreset)
 	}
 	if _, ok := d.state.Presets[batteryPreset]; !ok {
+		d.mu.Unlock()
 		return fmt.Errorf("battery preset %q not found", batteryPreset)
 	}
 	if current != nil && current.Enabled == enabled && current.ACPreset == acPreset && current.BatteryPreset == batteryPreset {
+		d.mu.Unlock()
 		return nil
 	}
+	applyNow := enabled && (current == nil || !current.Enabled)
+	if enabled && current != nil && current.Enabled {
+		if d.powerSource == cli.PowerSourceAC {
+			applyNow = applyNow || current.ACPreset != acPreset
+		} else if d.powerSource == cli.PowerSourceBattery {
+			applyNow = applyNow || current.BatteryPreset != batteryPreset
+		}
+	}
 	d.state.PowerPolicy = &api.PowerPolicy{Enabled: enabled, ACPreset: acPreset, BatteryPreset: batteryPreset}
-	if err := saveState(d.state); err != nil {
+	s := d.state
+	source := d.powerSource
+	d.mu.Unlock()
+	if err := saveState(s); err != nil {
 		return err
 	}
-	if enabled {
-		d.requestPolicyApply()
+	if applyNow {
+		if source != cli.PowerSourceAC && source != cli.PowerSourceBattery {
+			var err error
+			source, err = cli.ReadPowerSource()
+			if err != nil {
+				d.requestPolicyApply()
+				return fmt.Errorf("read power source: %w", err)
+			}
+		}
+		name := batteryPreset
+		if source == cli.PowerSourceAC {
+			name = acPreset
+		}
+		if err := d.applyPreset(name); err != nil {
+			d.requestPolicyApply()
+			return err
+		}
 	}
 	return nil
 }

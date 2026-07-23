@@ -429,6 +429,19 @@ func SendUndervoltReset() (bool, error) {
 	return true, nil
 }
 
+// SendTuningReset resets fan, TDP, and undervolt overrides while preserving
+// the physical profile, CPU power, display, and battery settings.
+func SendTuningReset() (bool, error) {
+	handled, resp, err := sendCommand(request{Cmd: "tuning-reset"})
+	if !handled || err != nil {
+		return handled, err
+	}
+	if !resp.OK {
+		return true, fmt.Errorf("%s", resp.Error)
+	}
+	return true, nil
+}
+
 // SendPresetSave saves the daemon's current performance and display state as name.
 func SendPresetSave(name string) (bool, error) {
 	return sendPresetCommand(request{Cmd: "preset-save", Name: name})
@@ -444,8 +457,13 @@ func SendPresetDelete(name string) (bool, error) {
 	return sendPresetCommand(request{Cmd: "preset-delete", Name: name})
 }
 
+// SendRestoreRecommended restores and applies the recommended power presets.
+func SendRestoreRecommended() (bool, error) {
+	return sendPresetCommand(request{Cmd: "restore-recommended"})
+}
+
 // SendPowerPolicySet configures automatic AC/battery preset switching. Empty
-// preset names preserve the current assignments (or select AC/Battery defaults).
+// preset names preserve the current assignments (or select recommended defaults).
 func SendPowerPolicySet(enabled bool, acPreset, batteryPreset string) (bool, error) {
 	return sendPresetCommand(request{
 		Cmd:       "power-policy-set",

@@ -49,6 +49,26 @@ var presetListCmd = &cobra.Command{
 	},
 }
 
+var presetRestoreRecommendedCmd = &cobra.Command{
+	Use:   "restore-recommended",
+	Short: "Restore and apply the recommended AC/battery presets",
+	Args:  cobra.NoArgs,
+	RunE: func(_ *cobra.Command, _ []string) error {
+		if dryRunFlag {
+			fmt.Println("Would restore and apply the recommended power presets")
+			return nil
+		}
+		handled, err := api.SendRestoreRecommended()
+		if err != nil {
+			return err
+		}
+		if !handled {
+			return fmt.Errorf("restoring recommended presets requires the z13ctl daemon")
+		}
+		return nil
+	},
+}
+
 func presetAction(use, short string, send func(string) (bool, error)) *cobra.Command {
 	return &cobra.Command{
 		Use:   use + " NAME",
@@ -118,6 +138,7 @@ var presetPolicyCmd = &cobra.Command{
 
 func init() {
 	presetCmd.AddCommand(presetListCmd)
+	presetCmd.AddCommand(presetRestoreRecommendedCmd)
 	presetCmd.AddCommand(presetAction("save", "Save current settings as a preset", api.SendPresetSave))
 	presetCmd.AddCommand(presetAction("apply", "Apply a named preset", api.SendPresetApply))
 	presetCmd.AddCommand(presetAction("delete", "Delete an unassigned preset", api.SendPresetDelete))

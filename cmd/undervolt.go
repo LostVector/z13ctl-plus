@@ -41,7 +41,7 @@ Safety limits (matching G-Helper defaults):
 Requires the ryzen_smu kernel module (ryzen_smu-dkms-git on Arch/AUR).
 The amkillam fork is required for Strix Halo (Ryzen AI MAX+) support.
 CO values are volatile — they reset on reboot and sleep. The daemon reapplies
-them automatically on startup and resume when the custom profile is active.`,
+them automatically on startup and resume while the override is active.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if !uvGetFlag && uvSetFlag == "" && !uvResetFlag {
@@ -65,12 +65,11 @@ func runUndervoltGet() error {
 		}
 		var resp struct {
 			api.UndervoltState
-			Profile string `json:"profile"`
 		}
 		if jErr := json.Unmarshal([]byte(value), &resp); jErr != nil {
 			return fmt.Errorf("parsing undervolt state: %w", jErr)
 		}
-		printUndervoltState(resp.UndervoltState, resp.Profile)
+		printUndervoltState(resp.UndervoltState)
 		return nil
 	}
 
@@ -82,7 +81,7 @@ func runUndervoltGet() error {
 	return nil
 }
 
-func printUndervoltState(uv api.UndervoltState, profile string) {
+func printUndervoltState(uv api.UndervoltState) {
 	if uv.CPUCO == 0 {
 		fmt.Println("Curve Optimizer: stock (0)")
 		return
@@ -90,7 +89,7 @@ func printUndervoltState(uv api.UndervoltState, profile string) {
 	if uv.Active {
 		fmt.Println("Curve Optimizer offsets:")
 	} else {
-		fmt.Printf("Curve Optimizer offsets (not active — %s profile):\n", profile)
+		fmt.Println("Curve Optimizer offsets (not active):")
 	}
 	suffix := ""
 	if !uv.Active {

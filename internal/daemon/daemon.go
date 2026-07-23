@@ -61,9 +61,14 @@ func Run(ctx context.Context, watchBtn bool) error {
 		displayCh: make(chan struct{}, 1),
 	}
 
-	d.state = loadState()
-	if err := d.seedDefaultPresets(); err != nil {
-		slog.Warn("failed to initialize power presets", "err", err)
+	var fresh bool
+	var err error
+	d.state, fresh, err = loadState()
+	if err != nil {
+		return fmt.Errorf("load state: %w", err)
+	}
+	if err := d.seedDefaultPresets(fresh); err != nil {
+		return fmt.Errorf("initialize power defaults: %w", err)
 	}
 	policyManaged := d.applyInitialPowerPolicy()
 
@@ -86,23 +91,17 @@ func Run(ctx context.Context, watchBtn bool) error {
 		}
 	}
 
-	// Restore stock profile if saved, but only if it differs from the
-	// kernel's current profile. Writing the same value to platform_profile
-	// still triggers a WMI call that resets the fan controller, briefly
-	// stopping fans — harmful on daemon restart where the profile hasn't
-	// changed. Skip "custom" — it's a virtual profile that the kernel
-	// rejects; custom fan curves and TDP are restored separately below.
-	if !policyManaged && d.state.Profile != "" && d.state.Profile != "custom" {
+	// Avoid a redundant profile write because it briefly stops firmware fan
+	// control, but always restore each independently active override.
+	if !policyManaged && isPhysicalProfile(d.state.Profile) {
 		current := ""
 		if data, readErr := os.ReadFile(cli.FindProfilePath()); readErr == nil {
 			current = strings.TrimSpace(string(data))
 		}
-		if current != d.state.Profile {
-			if profileErr := cli.SetProfile(d.state.Profile); profileErr != nil {
-				slog.Warn("failed to restore profile", "err", profileErr)
-			} else {
-				slog.Info("profile restored", "profile", d.state.Profile)
-			}
+		if err := applyTuning(d.state, current != d.state.Profile); err != nil {
+			slog.Warn("failed to restore profile tuning", "err", err)
+		} else {
+			slog.Info("profile tuning restored", "profile", d.state.Profile)
 		}
 	}
 
@@ -122,38 +121,6 @@ func Run(ctx context.Context, watchBtn bool) error {
 			slog.Warn("failed to restore panel overdrive", "err", poErr)
 		} else {
 			slog.Info("panel overdrive restored", "value", d.state.PanelOverdrive)
-		}
-	}
-
-	// Restore fan curve + TDP if last profile was "custom".
-	if !policyManaged && d.state.Profile == "custom" {
-		if fc := d.state.FanCurve; fc != nil && fc.Mode == 1 && len(fc.Points) == 8 {
-			if fcErr := cli.SetBothFanCurves(fc.Points); fcErr != nil {
-				slog.Warn("failed to restore fan curve", "err", fcErr)
-			} else {
-				slog.Info("fan curve restored")
-			}
-		}
-		if t := d.state.TDP; t != nil {
-			// Set fans to 80% minimum if sustained TDP exceeds safe max.
-			if t.PL1SPL > cli.TDPMaxSafe {
-				if fsErr := cli.SetBothFanCurves(cli.HighTDPFanCurve()); fsErr != nil {
-					slog.Warn("failed to set high-TDP fan curve for TDP restore", "err", fsErr)
-				}
-			}
-			if tdpErr := cli.SetTDP(0, t.PL1SPL, t.PL2SPPT, t.FPPT); tdpErr != nil {
-				slog.Warn("failed to restore TDP", "err", tdpErr)
-			} else {
-				slog.Info("TDP restored", "pl1", t.PL1SPL, "pl2", t.PL2SPPT, "pl3", t.FPPT)
-			}
-		}
-		if uv := d.state.Undervolt; uv != nil && cli.SMUProbeUndervolt() {
-			if uvErr := cli.SetCurveOptimizer(uv.CPUCO); uvErr != nil {
-				slog.Warn("failed to restore undervolt", "err", uvErr)
-			} else {
-				d.state.Undervolt.Active = true
-				slog.Info("undervolt restored", "cpu", uv.CPUCO)
-			}
 		}
 	}
 

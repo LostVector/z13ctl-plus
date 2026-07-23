@@ -24,7 +24,7 @@ cmd/                         Cobra subcommands
   daemon.go                  start the daemon (z13ctl daemon)
   list.go                    list hidraw devices
   off.go                     turn lighting off
-  profile.go                 get/set performance profile (platform_profile sysfs); "custom" virtual profile
+  profile.go                 get/set physical performance profile (platform_profile sysfs)
   preset.go                  named presets + automatic AC/battery assignment CLI
   display.go                 posture/rotation intent publisher for shared KScreen coordinator
   batterylimit.go            get/set battery charge limit (power_supply sysfs)
@@ -100,8 +100,8 @@ contrib/
   `WantedBy=graphical-session.target` (works in both desktop and Steam Gaming Mode).
   Logging goes to journald via stdout/stderr.
 - **State persistence**: `$XDG_STATE_HOME/z13ctl/state.json` (atomic write via temp +
-  rename). Daemon restores lighting, fan curves, and TDP on start. Fan curves and
-  TDP are only restored when `profile == "custom"` (stock profiles let firmware manage).
+  rename). `State.Profile` is always the physical profile; fan, TDP, and undervolt
+  overrides have independent persisted active flags and are restored independently.
 - **Named presets and power policy**: Presets independently capture profile,
   fan/TDP/undervolt, CPU min/EPP/boost, panel overdrive, and refresh rate. The
   daemon polls external `power_supply` devices and applies assigned AC/battery
@@ -181,16 +181,12 @@ contrib/
   which has empty calibration data). Five attributes: `ppt_pl1_spl` (Sustained),
   `ppt_pl2_sppt` (Short Boost), `ppt_fppt` (Fast Boost), `ppt_apu_sppt`,
   `ppt_platform_sppt`. Safety limits: 5–75W (safe), up to 93W with `--force`
-  (G-Helper absolute max for 2025 Z13 GZ302E). When any PPT value exceeds 75W,
-  all fans are forced to full speed before PPT writes. If fan write fails, TDP
-  write is aborted entirely. APU sPPT and Platform sPPT always follow PL2.
-- **Custom profile**: `profile --set custom` is a virtual profile that re-applies
-  saved fan curves and TDP from daemon state. It does NOT write to `platform_profile`
-  — the underlying hardware profile stays as-is. Setting any custom curve or TDP
-  implicitly sets profile to "custom". Switching to a stock profile (quiet/balanced/
-  performance) resets fan hardware to auto and TDP to firmware defaults, but preserves
-  custom settings in state for later recall. `profile --set custom` returns an error
-  if no custom fan curves or TDP have been saved.
+  (G-Helper absolute max for 2025 Z13 GZ302E). Sustained PL1 above 75W applies a
+  temporary 80%+ fan safety curve before PPT writes; the desired curve or auto
+  mode returns when PL1 becomes safe. APU sPPT and Platform sPPT follow PL2.
+- **Independent tuning overrides**: The physical profile is always quiet,
+  balanced, or performance. Fan curve, TDP, and undervolt overrides are activated
+  and reset independently. Profile changes preserve and reapply active overrides.
 - **Undervolt (Curve Optimizer)**: CPU voltage reduction via AMD Curve Optimizer,
   using direct SMU communication through the `ryzen_smu` kernel module's sysfs
   interface at `/sys/kernel/ryzen_smu_drv/`. Uses only the MP1 0x4C command for
@@ -200,13 +196,11 @@ contrib/
   whether the installed `ryzen_smu` fork actually supports CO commands on this
   platform (the amkillam fork is required for Strix Halo; the leogx9r fork does
   not work). CO values are volatile (reset on reboot/sleep); the daemon
-  reapplies them on startup and resume when the custom profile is active.
+  reapplies them on startup and resume while the override is active.
   Safety limit: CPU 0 to -40. `--get` returns saved values from daemon state
   plus the current profile (no sysfs readback exists for CO). `UndervoltState`
   includes an `Active bool` field indicating whether the offset is currently
-  applied. Switching to a stock profile resets CO in hardware but preserves
-  saved values in state for recall; the CLI displays "(not active)" when a
-  stock profile is active. The `get-state` response includes
+  applied. The `get-state` response includes
   `undervolt_available` (using `SMUProbeUndervolt()`, not just `SMUAvailable()`)
   so GUIs can hide controls when ryzen_smu is not installed or the wrong fork
   is present.

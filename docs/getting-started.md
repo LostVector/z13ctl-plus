@@ -113,8 +113,8 @@ instantaneous spikes for milliseconds. Setting all three to the same value gives
 a flat power cap; setting PL2 and PL3 higher allows bursty workloads to
 temporarily exceed PL1.
 
-Stock profiles (quiet/balanced/performance) manage TDP automatically. Custom TDP
-values override this and switch to the `custom` profile.
+Stock profiles (quiet/balanced/performance) manage TDP automatically. A custom
+TDP value is an independent override and does not change the physical profile.
 
 ```sh
 # Check current TDP/PPT values
@@ -129,7 +129,7 @@ z13ctl tdp --set 45 --pl2 55 --pl3 60
 # Force high TDP (above 75W, fans set to 80% minimum)
 z13ctl tdp --set 85 --force
 
-# Reset to balanced profile (firmware manages PPT)
+# Reset TDP to the current profile's firmware defaults
 z13ctl tdp --reset
 ```
 
@@ -142,7 +142,7 @@ temperatures and power draw without reducing performance. Requires the
 `ryzen_smu` kernel module (optional — see [Installation](installation.md)).
 
 CO values are volatile — they reset on reboot and sleep. The daemon reapplies
-them automatically on startup and resume when the custom profile is active.
+it automatically on startup and resume while the override is active.
 
 ```sh
 # Check current CO value
@@ -159,22 +159,22 @@ Safety limit (matching G-Helper defaults): CPU 0 to -40.
 
 ---
 
-## Custom profile
+## Independent tuning overrides
 
-The `custom` profile recalls previously saved fan curves, TDP, and undervolt
-settings from the daemon's state. At least one custom fan curve, TDP value, or
-undervolt offset must have been previously set.
+Fan curve, TDP, and undervolt controls are independently active. Changing the
+physical profile preserves and reapplies them; resetting one does not reset the
+others.
 
 ```sh
-# Set up a custom configuration
+# Set up independent overrides
 z13ctl fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
 z13ctl tdp --set 50
 
-# Recall it later with custom profile
-z13ctl profile --set custom
-
-# Switch back to a stock profile (resets fan curves and TDP)
+# Change the physical profile without dropping overrides
 z13ctl profile --set balanced
+
+# Reset only TDP
+z13ctl tdp --reset
 ```
 
 ---

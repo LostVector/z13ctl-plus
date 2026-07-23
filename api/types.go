@@ -4,9 +4,13 @@
 // z13ctl daemon over its Unix socket.
 package api
 
+// StateSchemaVersion is the current persisted state schema.
+const StateSchemaVersion = 1
+
 // State holds the last-applied settings for all controllable subsystems.
 // It is returned by SendGetState and broadcast as part of daemon responses.
 type State struct {
+	SchemaVersion      int                      `json:"schema_version,omitempty"`
 	Lighting           LightingState            `json:"lighting"`
 	Devices            map[string]LightingState `json:"devices,omitempty"` // per-device overrides keyed by name
 	Profile            string                   `json:"profile,omitempty"`
@@ -16,6 +20,10 @@ type State struct {
 	FanCurve           *FanCurveState           `json:"fan_curve,omitempty"`
 	TDP                *TDPState                `json:"tdp,omitempty"`
 	Undervolt          *UndervoltState          `json:"undervolt,omitempty"`
+	FanCurveActive     bool                     `json:"fan_curve_active,omitempty"`
+	TDPActive          bool                     `json:"tdp_active,omitempty"`
+	UndervoltActive    bool                     `json:"undervolt_active,omitempty"`
+	FanSafetyActive    bool                     `json:"fan_safety_active,omitempty"` // live: high-TDP curve overrides desired fan state
 	Presets            map[string]Preset        `json:"presets,omitempty"`
 	PowerPolicy        *PowerPolicy             `json:"power_policy,omitempty"`
 	ActivePreset       string                   `json:"active_preset,omitempty"`
@@ -105,11 +113,11 @@ type CPUPowerPreset struct {
 	Boost           bool   `json:"boost"`
 }
 
-// Preset is a named snapshot of performance and display settings.
-// A custom profile owns independent fan, TDP, and undervolt values.
+// Preset is a complete named snapshot of performance and display settings.
+// A nil tuning field resets that override when the preset is applied.
 type Preset struct {
 	Profile        string          `json:"profile"`
-	BaseProfile    string          `json:"base_profile,omitempty"` // physical profile beneath virtual custom
+	BaseProfile    string          `json:"base_profile,omitempty"` // legacy custom-profile migration only
 	FanCurve       *FanCurveState  `json:"fan_curve,omitempty"`
 	TDP            *TDPState       `json:"tdp,omitempty"`
 	Undervolt      *UndervoltState `json:"undervolt,omitempty"`

@@ -92,17 +92,6 @@ func runFanCurveSet() error {
 		return fmt.Errorf("invalid fan curve: %w", err)
 	}
 
-	// Enforce minimum PWM floor when sustained TDP exceeds safe max.
-	profile := readCurrentProfile()
-	if tdp, tdpErr := cli.ReadEffectivePPT(profile); tdpErr == nil && tdp.PL1SPL > cli.TDPMaxSafe {
-		for _, p := range points {
-			if p.PWM < cli.HighTDPMinPWM {
-				return fmt.Errorf("PWM %d at %d°C is below minimum %d (80%%) required when sustained TDP is above %dW",
-					p.PWM, p.Temp, cli.HighTDPMinPWM, cli.TDPMaxSafe)
-			}
-		}
-	}
-
 	if dryRunFlag {
 		cli.DryRunFanCurve(points)
 		return nil
@@ -114,6 +103,18 @@ func runFanCurveSet() error {
 		}
 		fmt.Println("Fan curves set for both fans (custom mode enabled)")
 		return nil
+	}
+
+	// Without the daemon there is no persisted desired/effective split, so a
+	// high-TDP direct write must itself satisfy the safety floor.
+	profile := readCurrentProfile()
+	if tdp, tdpErr := cli.ReadEffectivePPT(profile); tdpErr == nil && tdp.PL1SPL > cli.TDPMaxSafe {
+		for _, p := range points {
+			if p.PWM < cli.HighTDPMinPWM {
+				return fmt.Errorf("PWM %d at %d°C is below minimum %d (80%%) required when sustained TDP is above %dW",
+					p.PWM, p.Temp, cli.HighTDPMinPWM, cli.TDPMaxSafe)
+			}
+		}
 	}
 
 	if err := cli.SetBothFanCurves(points); err != nil {

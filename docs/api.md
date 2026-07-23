@@ -101,6 +101,16 @@ handled, err         := api.SendTdpReset()
 handled, value, err := api.SendUndervoltGet()
 handled, err         := api.SendUndervoltSet("-20")  // CPU CO -20
 handled, err         := api.SendUndervoltReset()
+
+// Reset fan, TDP, and undervolt overrides together
+handled, err := api.SendTuningReset()
+
+// Named power presets and automatic source switching
+handled, err := api.SendPresetSave("Daily")
+handled, err := api.SendPresetApply("Daily")
+handled, err := api.SendPresetDelete("Daily")
+handled, err := api.SendRestoreRecommended()
+handled, err := api.SendPowerPolicySet(true, "Plugged In", "On Battery")
 ```
 
 **Full state snapshot (for GUI initialization):**
@@ -112,8 +122,12 @@ if handled && err == nil {
     fmt.Println("profile:", state.Profile)
     fmt.Println("battery limit:", state.Battery)
     fmt.Println("fan curve:", state.FanCurve)
+    fmt.Println("fan override active:", state.FanCurveActive)
+    fmt.Println("fan safety active:", state.FanSafetyActive)
     fmt.Println("tdp:", state.TDP)
+    fmt.Println("tdp override active:", state.TDPActive)
     fmt.Println("undervolt:", state.Undervolt)
+    fmt.Println("undervolt override active:", state.UndervoltActive)
     fmt.Println("undervolt available:", state.UndervoltAvailable)
     fmt.Println("CPU power:", state.CPUPower)
     fmt.Println("APU temp:", state.Temperature, "°C")

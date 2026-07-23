@@ -286,6 +286,19 @@ func ExampleSendUndervoltReset() {
 	fmt.Println("undervolt reset")
 }
 
+func ExampleSendRestoreRecommended() {
+	handled, err := api.SendRestoreRecommended()
+	if !handled {
+		fmt.Println("daemon not running")
+		return
+	}
+	if err != nil {
+		fmt.Println("error:", err)
+		return
+	}
+	fmt.Println("recommended presets restored")
+}
+
 func ExampleSendGetState() {
 	// Fetch the daemon's full cached state for GUI initialization.
 	handled, state, err := api.SendGetState()

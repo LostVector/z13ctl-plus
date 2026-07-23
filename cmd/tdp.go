@@ -37,12 +37,12 @@ the same value. Use --pl1, --pl2, --pl3 to override individual limits.
 
 Safety: The sustained power limit (PL1) is capped at 75W by default. Use --force
 to allow PL1 up to 93W (the absolute hardware maximum for the ROG Flow Z13
-GZ302E). When PL1 exceeds 75W, fans are automatically set to full speed for
+GZ302E). When PL1 exceeds 75W, fans are temporarily locked to an 80%+ curve for
 thermal safety. Burst limits (PL2/PL3) are allowed up to 93W without --force
 since short bursts are thermally safe.
 
-With --reset, switches to the balanced profile and resets fan curves to auto mode.
-The firmware then manages PPT and fan curves automatically.
+With --reset, restores the current physical profile's firmware PPT defaults.
+Other active overrides are preserved when the daemon is running.
 
 PPT attributes:
   PL1/SPL          — Sustained Power Limit: the continuous power budget the APU
@@ -58,8 +58,8 @@ When using --set, all three limits are set to the same value by default. Use
 --pl1, --pl2, and --pl3 to set them independently — for example, --set 45
 --pl2 55 --pl3 65 allows short bursts up to 65W while sustaining 45W.
 
-Stock profiles (quiet/balanced/performance) let the firmware manage TDP
-dynamically. Setting a custom TDP switches to the "custom" profile.`,
+The physical profile remains quiet, balanced, or performance while a custom TDP
+override is active.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if !tdpGetFlag && tdpSetFlag == "" && !tdpResetFlag {
@@ -140,20 +140,21 @@ func runTdpSet() error {
 		return nil
 	}
 
-	// Safety: set fans to 80% minimum when sustained TDP exceeds safe max.
-	if pl1 > cli.TDPMaxSafe {
-		if err := cli.SetBothFanCurves(cli.HighTDPFanCurve()); err != nil {
-			return fmt.Errorf("failed to set high-TDP fan curve: %w (refusing to apply unsafe TDP)", err)
-		}
-		fmt.Println("Fans set to 80%+ curve for thermal safety")
-	}
-
 	if handled, err := api.SendTdpSet(tdpSetFlag, tdpPL1Flag, tdpPL2Flag, tdpPL3Flag, tdpForceFlag); handled {
 		if err != nil {
 			return err
 		}
 		fmt.Printf("TDP set to %dW\n", watts)
 		return nil
+	}
+
+	// Direct fallback has no daemon safety planner, so lock the fans before
+	// writing a high sustained limit.
+	if pl1 > cli.TDPMaxSafe {
+		if err := cli.SetBothFanCurves(cli.HighTDPFanCurve()); err != nil {
+			return fmt.Errorf("failed to set high-TDP fan curve: %w (refusing to apply unsafe TDP)", err)
+		}
+		fmt.Println("Fans set to 80%+ curve for thermal safety")
 	}
 
 	if err := cli.SetTDP(watts, pl1, pl2, pl3); err != nil {
@@ -173,19 +174,15 @@ func runTdpReset() error {
 		if err != nil {
 			return err
 		}
-		fmt.Println("TDP reset: switched to balanced profile (firmware manages PPT)")
+		fmt.Println("TDP override reset to physical profile defaults")
 		return nil
 	}
 
-	// Direct path (no daemon): reset fans to auto, then switch to balanced
-	// profile. The firmware sets per-profile PPT and fan curves automatically.
-	if err := cli.ResetAllFanCurves(); err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to reset fan curves: %v\n", err)
+	profile := readCurrentProfile()
+	if err := cli.SetProfile(profile); err != nil {
+		return fmt.Errorf("resetting TDP for %s profile: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", profile, err)
 	}
-	if err := cli.SetProfile("balanced"); err != nil {
-		return fmt.Errorf("switching to balanced profile: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
-	}
-	fmt.Println("TDP reset: switched to balanced profile")
+	fmt.Printf("TDP reset to %s profile defaults\n", profile)
 	return nil
 }
 
@@ -217,7 +214,7 @@ func parsePLOverrides(watts int) (pl1, pl2, pl3 int, err error) {
 func init() {
 	tdpCmd.Flags().BoolVar(&tdpGetFlag, "get", false, "Print current TDP power limits")
 	tdpCmd.Flags().StringVar(&tdpSetFlag, "set", "", "Set TDP power limit in watts")
-	tdpCmd.Flags().BoolVar(&tdpResetFlag, "reset", false, "Reset to balanced profile (firmware manages PPT)")
+	tdpCmd.Flags().BoolVar(&tdpResetFlag, "reset", false, "Reset TDP to physical profile defaults")
 	tdpCmd.Flags().StringVar(&tdpPL1Flag, "pl1", "", "Override PL1/SPL (watts)")
 	tdpCmd.Flags().StringVar(&tdpPL2Flag, "pl2", "", "Override PL2/sPPT (watts)")
 	tdpCmd.Flags().StringVar(&tdpPL3Flag, "pl3", "", "Override PL3/fPPT (watts)")

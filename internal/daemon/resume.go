@@ -13,7 +13,6 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/dahui/z13ctl/internal/aura"
-	"github.com/dahui/z13ctl/internal/cli"
 )
 
 // watchResume connects to the system DBus and listens for resume events.
@@ -106,50 +105,9 @@ func (d *Daemon) restoreVolatileState() {
 		return
 	}
 
-	if state.Profile != "custom" {
-		slog.Info("skipping volatile state restore (stock profile active)", "profile", state.Profile)
-		return
-	}
-
-	// Restore fan curve.
-	if fc := state.FanCurve; fc != nil && fc.Mode == 1 && len(fc.Points) == 8 {
-		if err := cli.SetBothFanCurves(fc.Points); err != nil {
-			slog.Warn("resume: failed to restore fan curve", "err", err)
-		} else {
-			slog.Info("resume: fan curve restored")
-		}
-	}
-
-	// Restore TDP.
-	if t := state.TDP; t != nil {
-		if t.PL1SPL > cli.TDPMaxSafe {
-			if err := cli.SetBothFanCurves(cli.HighTDPFanCurve()); err != nil {
-				slog.Warn("resume: failed to set high-TDP fan curve", "err", err)
-			}
-		}
-		if err := cli.SetTDP(0, t.PL1SPL, t.PL2SPPT, t.FPPT); err != nil {
-			slog.Warn("resume: failed to restore TDP", "err", err)
-		} else {
-			slog.Info("resume: TDP restored", "pl1", t.PL1SPL, "pl2", t.PL2SPPT, "pl3", t.FPPT)
-		}
-	}
-
-	// Restore undervolt.
-	if uv := state.Undervolt; uv != nil && cli.SMUProbeUndervolt() {
-		d.mu.Lock()
-		if d.state.Undervolt != nil {
-			d.state.Undervolt.Active = false
-		}
-		d.mu.Unlock()
-		if err := cli.SetCurveOptimizer(uv.CPUCO); err != nil {
-			slog.Warn("resume: failed to restore undervolt", "err", err)
-		} else {
-			d.mu.Lock()
-			if d.state.Undervolt != nil {
-				d.state.Undervolt.Active = true
-			}
-			d.mu.Unlock()
-			slog.Info("resume: undervolt restored", "cpu", uv.CPUCO)
-		}
+	if err := applyTuning(state, false); err != nil {
+		slog.Warn("resume: failed to restore tuning", "err", err)
+	} else {
+		slog.Info("resume: tuning restored", "profile", state.Profile)
 	}
 }

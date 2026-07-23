@@ -136,9 +136,8 @@ minimum, EPP, boost, and available limits), and `undervolt_available`
 (whether the `ryzen_smu` kernel module is present) from live sysfs reads.
 These are not persisted — they are real-time sensor values.
 
-On startup the daemon reads this file and restores all saved settings before
-accepting any connections. If the last profile was `custom`, saved fan curves,
-TDP values, and undervolt offsets are re-applied to the hardware.
+On startup the daemon reads this file and independently restores each active fan
+curve, TDP, and undervolt override before accepting connections.
 
 !!! note "Raw hidrawN paths are not persisted"
     Commands sent with `--device /dev/hidraw2` (a raw path) are applied but
@@ -161,7 +160,7 @@ is left untouched. KWin remains the output owner.
 
 Manual preset changes are not continuously overwritten. On resume, an active
 named preset is restored in full; otherwise the daemon restores the current
-manual profile and volatile custom settings. Display posture intent is then
+manual physical profile and active tuning overrides. Display posture intent is then
 reconciled without replacing the manual choice with a source default.
 
 ---
@@ -178,10 +177,8 @@ sleep (suspend/hibernate) and must be reapplied on resume:
 
 The daemon monitors D-Bus for `org.freedesktop.login1.Manager.PrepareForSleep`
 signals from systemd-logind. When the system resumes (`PrepareForSleep(false)`),
-the daemon restores lighting (regardless of profile) and all custom-profile
-volatile settings from its saved state. Fan curves, TDP, and undervolt are only
-restored when the `custom` profile is active — stock profiles (`quiet`,
-`balanced`, `performance`) let the firmware manage these settings.
+the daemon restores lighting (regardless of profile) and each independently
+active volatile override from its saved state.
 
 This happens transparently with no user intervention. You can verify it worked
 by checking the daemon logs after a resume:
