@@ -57,15 +57,18 @@ func ReadBatteryState() (*api.BatteryState, error) {
 	whDesignW := energyDesign / microwattsPerWatt
 
 	return &api.BatteryState{
-		CapacityPct:  cap,
-		Status:       status,
-		HealthPct:    health,
-		PowerWatts:   formatWatts(powerMicroW),
-		VoltageVolts: formatVolts(voltageMicroV),
-		ThresholdPct: threshold,
-		Charging:     status == "Charging",
-		WhCurrent:    whCurrentW,
-		WhDesign:     whDesignW,
+		CapacityPct:    cap,
+		Status:         status,
+		HealthPct:      health,
+		PowerWatts:     formatWatts(powerMicroW),
+		VoltageVolts:   formatVolts(voltageMicroV),
+		ThresholdPct:   threshold,
+		Charging:       status == "Charging",
+		WhCurrent:      whCurrentW,
+		WhDesign:       whDesignW,
+		EnergyNowWh:    float64(energyNow) / microwattsPerWatt,
+		EnergyFullWh:   float64(energyFull) / microwattsPerWatt,
+		EnergyDesignWh: float64(energyDesign) / microwattsPerWatt,
 	}, nil
 }
 

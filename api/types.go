@@ -74,15 +74,18 @@ type TelemetryState struct {
 // Health % is computed from energy_full / energy_full_design. Power is
 // instantaneous (positive = discharging, 0 = idle or charging at threshold).
 type BatteryState struct {
-	CapacityPct  int    `json:"capacity_pct"`  // 0–100, current charge relative to threshold
-	Status       string `json:"status"`        // "Charging" / "Discharging" / "Not charging" / "Full"
-	HealthPct    int    `json:"health_pct"`    // energy_full / energy_full_design × 100
-	PowerWatts   string `json:"power_watts"`   // instantaneous draw in watts ("12.3" or "0")
-	VoltageVolts string `json:"voltage_volts"` // terminal voltage in volts
-	ThresholdPct int    `json:"threshold_pct"` // charge_control_end_threshold (40–100)
-	Charging     bool   `json:"charging"`      // true when Status == "Charging"
-	WhCurrent    int    `json:"wh_current"`    // energy_now in Wh (last full or current)
-	WhDesign     int    `json:"wh_design"`     // energy_full_design in Wh
+	CapacityPct    int     `json:"capacity_pct"`     // 0–100, current charge relative to threshold
+	Status         string  `json:"status"`           // "Charging" / "Discharging" / "Not charging" / "Full"
+	HealthPct      int     `json:"health_pct"`       // energy_full / energy_full_design × 100
+	PowerWatts     string  `json:"power_watts"`      // instantaneous draw in watts ("12.3" or "0")
+	VoltageVolts   string  `json:"voltage_volts"`    // terminal voltage in volts
+	ThresholdPct   int     `json:"threshold_pct"`    // charge_control_end_threshold (40–100)
+	Charging       bool    `json:"charging"`         // true when Status == "Charging"
+	WhCurrent      int     `json:"wh_current"`       // energy_now in Wh (last full or current)
+	WhDesign       int     `json:"wh_design"`        // energy_full_design in Wh
+	EnergyNowWh    float64 `json:"energy_now_wh"`    // remaining energy_now in Wh
+	EnergyFullWh   float64 `json:"energy_full_wh"`   // current full-charge capacity in Wh
+	EnergyDesignWh float64 `json:"energy_design_wh"` // original energy_full_design in Wh
 }
 
 // CPUPowerState captures the live AMD P-State controls exposed by cpufreq.
