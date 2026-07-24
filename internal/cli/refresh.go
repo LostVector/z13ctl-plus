@@ -15,11 +15,14 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"os"
 	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/godbus/dbus/v5"
 )
 
 const (
@@ -28,6 +31,10 @@ const (
 	outputName = "eDP-1"
 
 	refreshTimeout = 3 * time.Second
+
+	systemdBusName = "org.freedesktop.systemd1"
+	systemdPath    = dbus.ObjectPath("/org/freedesktop/systemd1")
+	systemdManager = "org.freedesktop.systemd1.Manager"
 )
 
 // supportedRefreshRates is the whitelist we expose in the UI. The panel
@@ -62,7 +69,7 @@ func ReadRefreshRate() int {
 func ReadInternalDisplay() (InternalDisplayState, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, kscreenBin, "-o").CombinedOutput()
+	out, err := kscreenCommand(ctx, "-o").CombinedOutput()
 	if err != nil {
 		return InternalDisplayState{}, err
 	}
@@ -139,13 +146,35 @@ func ApplyInternalDisplay(scale float64, rotation string, hz int) error {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), refreshTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, kscreenBin, args...)
+	cmd := kscreenCommand(ctx, args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
 		return fmt.Errorf("kscreen-doctor %s: %w%s", strings.Join(args, " "), err, suffixNonEmpty(stderr.String()))
 	}
 	return nil
+}
+
+// kscreenCommand adds graphical-session variables that may have reached the
+// systemd user manager after socket activation started the daemon.
+func kscreenCommand(ctx context.Context, args ...string) *exec.Cmd {
+	cmd := exec.CommandContext(ctx, kscreenBin, args...)
+	cmd.Env = os.Environ()
+	conn, err := dbus.SessionBus()
+	if err != nil {
+		return cmd
+	}
+	var environment dbus.Variant
+	err = conn.Object(systemdBusName, systemdPath).
+		CallWithContext(ctx, "org.freedesktop.DBus.Properties.Get", 0, systemdManager, "Environment").
+		Store(&environment)
+	if err != nil {
+		return cmd
+	}
+	if values, ok := environment.Value().([]string); ok {
+		cmd.Env = append(cmd.Env, values...)
+	}
+	return cmd
 }
 
 func rotationName(value string) string {
