@@ -24,27 +24,11 @@ watches the Armoury Crate button.
 
 Compared with the upstream project, z13ctl-plus adds:
 
-### Features
-
 - CPU minimum-frequency, energy-performance-preference, and boost controls
 - Named performance presets with automatic AC/battery switching
 - Coordinated display posture, rotation, scale, and refresh-rate handling
 - Independent fan-curve, TDP, and undervolt overrides
 - Live CPU, GPU, VRAM, NPU, fan, thermal, and detailed battery telemetry
-
-### Bug fixes
-
-- Restores lighting after keyboard reattach, sleep/resume, and lid-open unlock
-- Finds the graphical session reliably for KScreen on desktop and Steam Gaming Mode
-- Applies sysfs permissions reliably across late-created battery, firmware,
-  power, fan, CPU, and `ryzen_smu` controls
-
-### Code cleanup
-
-- Removed dead fan-preset, HID feature-report, and unused hardware-helper paths
-- Consolidated repeated API, sysfs, daemon response, clone, and test logic
-- Made the protocol reference single-source and removed generated API-doc tooling
-- Removed more than 1,100 net lines while retaining compatibility and zero lint issues
 
 > [!TIP]
 > **New to Linux? Install [z13gui](https://github.com/dahui/z13gui).** Most
