@@ -12,6 +12,30 @@ command and retains the canonical `github.com/dahui/z13ctl/api` Go API.
 
 ---
 
+## What the plus fork adds
+
+### Features
+
+- CPU minimum-frequency, energy-performance-preference, and boost controls
+- Named presets with automatic AC/battery switching
+- Coordinated display posture, rotation, scale, and refresh-rate handling
+- Independent fan-curve, TDP, and undervolt overrides
+- Expanded CPU, GPU, VRAM, NPU, thermal, fan, and battery telemetry
+
+### Bug fixes
+
+- Lighting restoration after keyboard reattach, sleep/resume, and lid-open unlock
+- Reliable KScreen graphical-session discovery on desktop and Steam Gaming Mode
+- Reliable permissions for late-created sysfs controls
+
+### Code cleanup
+
+- Removed dead hardware-control and preset paths
+- Consolidated repeated API, sysfs, daemon, clone, and test logic
+- Removed generated/duplicated documentation and more than 1,100 net lines
+
+---
+
 ## What z13ctl-plus does
 
 - **RGB lighting** — set color, mode, speed, and brightness on the keyboard backlight
