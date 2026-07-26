@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"math"
+	"slices"
 	"time"
 
 	"github.com/dahui/z13ctl/internal/cli"
@@ -58,14 +59,7 @@ func (d *Daemon) setDisplayRotation(rotation string) error {
 }
 
 func (d *Daemon) setDisplayRefresh(hz int) error {
-	valid := false
-	for _, supported := range cli.SupportedRefreshRates() {
-		if hz == supported {
-			valid = true
-			break
-		}
-	}
-	if !valid {
+	if !slices.Contains(cli.SupportedRefreshRates(), hz) {
 		return fmt.Errorf("unsupported refresh rate %d", hz)
 	}
 	d.displayMu.Lock()

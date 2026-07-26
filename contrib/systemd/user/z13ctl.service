@@ -1,5 +1,5 @@
 [Unit]
-Description=z13ctl device daemon
+Description=z13ctl-plus device daemon
 Requires=z13ctl.socket
 After=z13ctl.socket
 

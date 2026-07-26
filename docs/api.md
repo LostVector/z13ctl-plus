@@ -13,6 +13,11 @@ import "github.com/dahui/z13ctl/api"
 The module is deliberately stdlib-only (no third-party dependencies) so that
 integrations can pull it in without inheriting the CLI's dependency tree.
 
+!!! note "Canonical upstream module"
+    z13ctl-plus intentionally retains the upstream module path for compatibility.
+    Tagging the plus repository does not republish `github.com/dahui/z13ctl/api`;
+    externally consumable API changes must be released by the upstream project.
+
 It is a separate Go module at `./api` with its own `go.mod`. If you are working
 on both the main binary and the API library simultaneously, create a
 [go.work](https://go.dev/ref/mod#workspaces) file:
@@ -148,9 +153,7 @@ for event := range ch {
 }
 ```
 
----
-
 ## Full API reference
 
-See the [API Reference](api-reference.md) page for full documentation
-of all exported types and functions.
+See [pkg.go.dev](https://pkg.go.dev/github.com/dahui/z13ctl/api) for full
+documentation of all exported types and functions.

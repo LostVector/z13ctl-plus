@@ -1,4 +1,4 @@
-// z13ctl — system control for the 2025 ASUS ROG Flow Z13
+// z13ctl-plus — system control for the 2025 ASUS ROG Flow Z13
 //
 // Controls keyboard and lightbar RGB (via Linux hidraw), performance profile,
 // and battery charge limit (via asus-wmi sysfs interfaces).
@@ -11,15 +11,10 @@
 package main
 
 import (
-	"fmt"
-	"os"
-
 	"github.com/dahui/z13ctl/cmd"
+	"github.com/spf13/cobra"
 )
 
 func main() {
-	if err := cmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, "Error:", err)
-		os.Exit(1)
-	}
+	cobra.CheckErr(cmd.Execute())
 }

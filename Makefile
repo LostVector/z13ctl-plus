@@ -70,9 +70,8 @@ uninstall-perms-service:
 	systemctl daemon-reload
 	@echo "Permissions service removed."
 
-## docs: generate API reference and serve mkdocs locally
+## docs: serve mkdocs locally
 docs:
-	go run github.com/princjef/gomarkdoc/cmd/gomarkdoc@latest ./api/... > docs/api-reference.md
 	mkdocs serve
 
 ## clean: remove all generated build and test artifacts

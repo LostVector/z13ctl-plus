@@ -21,7 +21,6 @@ import (
 	"net"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 
 	"github.com/coreos/go-systemd/v22/activation"
@@ -67,8 +66,8 @@ func Run(ctx context.Context, watchBtn bool) error {
 	if err != nil {
 		return fmt.Errorf("load state: %w", err)
 	}
-	if err := d.seedDefaultPresets(fresh); err != nil {
-		return fmt.Errorf("initialize power defaults: %w", err)
+	if seedErr := d.seedDefaultPresets(fresh); seedErr != nil {
+		return fmt.Errorf("initialize power defaults: %w", seedErr)
 	}
 	policyManaged := d.applyInitialPowerPolicy()
 
@@ -94,12 +93,9 @@ func Run(ctx context.Context, watchBtn bool) error {
 	// Avoid a redundant profile write because it briefly stops firmware fan
 	// control, but always restore each independently active override.
 	if !policyManaged && isPhysicalProfile(d.state.Profile) {
-		current := ""
-		if data, readErr := os.ReadFile(cli.FindProfilePath()); readErr == nil {
-			current = strings.TrimSpace(string(data))
-		}
-		if err := applyTuning(d.state, current != d.state.Profile); err != nil {
-			slog.Warn("failed to restore profile tuning", "err", err)
+		current, _ := readTrimmed(cli.FindProfilePath())
+		if tuningErr := applyTuning(d.state, current != d.state.Profile); tuningErr != nil {
+			slog.Warn("failed to restore profile tuning", "err", tuningErr)
 		} else {
 			slog.Info("profile tuning restored", "profile", d.state.Profile)
 		}

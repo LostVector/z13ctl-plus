@@ -63,13 +63,11 @@ func runUndervoltGet() error {
 		if err != nil {
 			return err
 		}
-		var resp struct {
-			api.UndervoltState
-		}
-		if jErr := json.Unmarshal([]byte(value), &resp); jErr != nil {
+		var state api.UndervoltState
+		if jErr := json.Unmarshal([]byte(value), &state); jErr != nil {
 			return fmt.Errorf("parsing undervolt state: %w", jErr)
 		}
-		printUndervoltState(resp.UndervoltState)
+		printUndervoltState(state)
 		return nil
 	}
 

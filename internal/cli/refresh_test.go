@@ -18,21 +18,7 @@ func TestSupportedRefreshRates(t *testing.T) {
 	}
 }
 
-func TestIsSupportedRate(t *testing.T) {
-	t.Parallel()
-	for _, hz := range []int{60, 180} {
-		if !isSupportedRate(hz) {
-			t.Errorf("isSupportedRate(%d) = false, want true", hz)
-		}
-	}
-	for _, hz := range []int{0, 30, 90, 120, 144, -60} {
-		if isSupportedRate(hz) {
-			t.Errorf("isSupportedRate(%d) = true, want false", hz)
-		}
-	}
-}
-
-func TestParseCurrentRefresh(t *testing.T) {
+func TestParseInternalDisplayRefresh(t *testing.T) {
 	t.Parallel()
 	cases := []struct {
 		name string
@@ -74,9 +60,9 @@ func TestParseCurrentRefresh(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
-			got := parseCurrentRefresh([]byte(tc.out))
-			if got != tc.want {
-				t.Errorf("parseCurrentRefresh() = %d, want %d", got, tc.want)
+			state, _ := parseInternalDisplay([]byte(tc.out))
+			if state.Refresh != tc.want {
+				t.Errorf("parseInternalDisplay().Refresh = %d, want %d", state.Refresh, tc.want)
 			}
 		})
 	}

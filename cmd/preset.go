@@ -4,7 +4,8 @@ package cmd
 
 import (
 	"fmt"
-	"sort"
+	"maps"
+	"slices"
 
 	"github.com/dahui/z13ctl/api"
 
@@ -28,11 +29,7 @@ var presetListCmd = &cobra.Command{
 		if !handled {
 			return fmt.Errorf("preset management requires the z13ctl daemon")
 		}
-		names := make([]string, 0, len(state.Presets))
-		for name := range state.Presets {
-			names = append(names, name)
-		}
-		sort.Strings(names)
+		names := slices.Sorted(maps.Keys(state.Presets))
 		for _, name := range names {
 			preset := state.Presets[name]
 			active := ""

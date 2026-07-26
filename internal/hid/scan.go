@@ -70,7 +70,7 @@ func findAll() (*Device, error) {
 
 	if len(nodes) == 0 {
 		return nil, fmt.Errorf(
-			"no ASUS Aura devices found (keyboard / lightbar); try sudo or add a udev rule:\n"+
+			"no ASUS Aura devices found (keyboard / lightbar); try sudo or add a udev rule:\n" +
 				"  SUBSYSTEM==\"hidraw\", ATTRS{idVendor}==\"0b05\", MODE=\"0660\", GROUP=\"users\"",
 		)
 	}
@@ -165,11 +165,8 @@ func deviceNameFromUevent(ueventPath string) string {
 
 	scanner := bufio.NewScanner(f)
 	for scanner.Scan() {
-		line := scanner.Text()
-		for _, spec := range knownDevices {
-			if line == spec.hidID {
-				return spec.name
-			}
+		if name, ok := knownDevices[scanner.Text()]; ok {
+			return name
 		}
 	}
 	return ""

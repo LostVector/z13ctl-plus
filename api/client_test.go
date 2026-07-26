@@ -1,7 +1,6 @@
 package api
 
 import (
-	"bufio"
 	"encoding/json"
 	"net"
 	"os"
@@ -9,7 +8,8 @@ import (
 	"testing"
 )
 
-func TestSendRestoreRecommendedProtocol(t *testing.T) {
+func assertCommandSent(t *testing.T, send func() (bool, error), want string) {
+	t.Helper()
 	runtimeDir := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
 	if err := os.MkdirAll(filepath.Dir(SocketPath()), 0o700); err != nil {
@@ -29,52 +29,26 @@ func TestSendRestoreRecommendedProtocol(t *testing.T) {
 		}
 		defer conn.Close()
 		var got request
-		_ = json.NewDecoder(bufio.NewReader(conn)).Decode(&got)
+		_ = json.NewDecoder(conn).Decode(&got)
 		requestCh <- got
 		_, _ = conn.Write([]byte("{\"ok\":true}\n"))
 	}()
 
-	handled, err := SendRestoreRecommended()
+	handled, err := send()
 	if err != nil || !handled {
-		t.Fatalf("SendRestoreRecommended() = %t, %v", handled, err)
+		t.Fatalf("send() = %t, %v", handled, err)
 	}
-	if got := <-requestCh; got.Cmd != "restore-recommended" {
-		t.Fatalf("command = %q", got.Cmd)
+	if got := <-requestCh; got.Cmd != want {
+		t.Fatalf("command = %q, want %q", got.Cmd, want)
 	}
 }
 
+func TestSendRestoreRecommendedProtocol(t *testing.T) {
+	assertCommandSent(t, SendRestoreRecommended, "restore-recommended")
+}
+
 func TestSendTuningResetProtocol(t *testing.T) {
-	runtimeDir := t.TempDir()
-	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
-	if err := os.MkdirAll(filepath.Dir(SocketPath()), 0o700); err != nil {
-		t.Fatal(err)
-	}
-	listener, err := net.Listen("unix", SocketPath())
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer listener.Close()
-
-	requestCh := make(chan request, 1)
-	go func() {
-		conn, acceptErr := listener.Accept()
-		if acceptErr != nil {
-			return
-		}
-		defer conn.Close()
-		var got request
-		_ = json.NewDecoder(bufio.NewReader(conn)).Decode(&got)
-		requestCh <- got
-		_, _ = conn.Write([]byte("{\"ok\":true}\n"))
-	}()
-
-	handled, err := SendTuningReset()
-	if err != nil || !handled {
-		t.Fatalf("SendTuningReset() = %t, %v", handled, err)
-	}
-	if got := <-requestCh; got.Cmd != "tuning-reset" {
-		t.Fatalf("command = %q", got.Cmd)
-	}
+	assertCommandSent(t, SendTuningReset, "tuning-reset")
 }
 
 func TestStateProtocolIncludesTuningFlags(t *testing.T) {

@@ -6,7 +6,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -121,10 +121,10 @@ func (d *Daemon) capturePreset() api.Preset {
 		p.FanCurve = cloneFanCurve(d.state.FanCurve)
 	}
 	if d.state.TDPActive {
-		p.TDP = cloneTDP(d.state.TDP)
+		p.TDP = clonePtr(d.state.TDP)
 	}
 	if d.state.UndervoltActive {
-		p.Undervolt = cloneUndervolt(d.state.Undervolt)
+		p.Undervolt = clonePtr(d.state.Undervolt)
 	}
 	d.mu.Unlock()
 	if p.Undervolt != nil {
@@ -166,7 +166,7 @@ func (d *Daemon) savePreset(name string) error {
 	d.state.Presets = presets
 	s := d.state
 	s.Presets = clonePresetMap(d.state.Presets)
-	s.PowerPolicy = clonePowerPolicy(d.state.PowerPolicy)
+	s.PowerPolicy = clonePtr(d.state.PowerPolicy)
 	d.mu.Unlock()
 	return saveState(s)
 }
@@ -209,8 +209,8 @@ func (d *Daemon) applyPreset(name string) error {
 	}
 	next.Profile = preset.Profile
 	next.FanCurve = cloneFanCurve(preset.FanCurve)
-	next.TDP = cloneTDP(preset.TDP)
-	next.Undervolt = cloneUndervolt(preset.Undervolt)
+	next.TDP = clonePtr(preset.TDP)
+	next.Undervolt = clonePtr(preset.Undervolt)
 	next.FanCurveActive = preset.FanCurve != nil
 	next.TDPActive = preset.TDP != nil
 	next.UndervoltActive = preset.Undervolt != nil
@@ -262,7 +262,7 @@ func (d *Daemon) applyPreset(name string) error {
 	d.state.ActivePreset = name
 	s := d.state
 	s.Presets = clonePresetMap(d.state.Presets)
-	s.PowerPolicy = clonePowerPolicy(d.state.PowerPolicy)
+	s.PowerPolicy = clonePtr(d.state.PowerPolicy)
 	d.mu.Unlock()
 	if err := saveState(s); err != nil {
 		return err
@@ -272,11 +272,11 @@ func (d *Daemon) applyPreset(name string) error {
 }
 
 func readOptionalInt(path string) (int, error) {
-	data, err := os.ReadFile(path)
+	value, err := readTrimmed(path)
 	if err != nil {
 		return 0, err
 	}
-	return strconv.Atoi(strings.TrimSpace(string(data)))
+	return strconv.Atoi(value)
 }
 
 func validatePresetName(name string) (string, error) {
@@ -288,9 +288,7 @@ func validatePresetName(name string) (string, error) {
 }
 
 func validatePreset(p api.Preset) error {
-	switch p.Profile {
-	case "quiet", "balanced", "performance":
-	default:
+	if !isPhysicalProfile(p.Profile) {
 		return fmt.Errorf("invalid profile %q", p.Profile)
 	}
 	if p.RefreshRate != 0 && p.RefreshRate != 60 && p.RefreshRate != 180 {
@@ -341,14 +339,7 @@ func validatePresetHardware(p api.Preset) error {
 	if p.CPUPower.MinFrequencyKHz < current.MinLimitKHz || p.CPUPower.MinFrequencyKHz > current.MaxLimitKHz {
 		return fmt.Errorf("CPU minimum %d kHz out of range %d-%d", p.CPUPower.MinFrequencyKHz, current.MinLimitKHz, current.MaxLimitKHz)
 	}
-	validEPP := false
-	for _, choice := range current.EPPChoices {
-		if choice == p.CPUPower.EPP {
-			validEPP = true
-			break
-		}
-	}
-	if !validEPP {
+	if !slices.Contains(current.EPPChoices, p.CPUPower.EPP) {
 		return fmt.Errorf("CPU EPP %q is unavailable", p.CPUPower.EPP)
 	}
 	return nil
@@ -363,15 +354,7 @@ func cloneFanCurve(in *api.FanCurveState) *api.FanCurveState {
 	return &out
 }
 
-func cloneTDP(in *api.TDPState) *api.TDPState {
-	if in == nil {
-		return nil
-	}
-	out := *in
-	return &out
-}
-
-func cloneUndervolt(in *api.UndervoltState) *api.UndervoltState {
+func clonePtr[T any](in *T) *T {
 	if in == nil {
 		return nil
 	}
@@ -381,16 +364,10 @@ func cloneUndervolt(in *api.UndervoltState) *api.UndervoltState {
 
 func clonePreset(in api.Preset) api.Preset {
 	in.FanCurve = cloneFanCurve(in.FanCurve)
-	in.TDP = cloneTDP(in.TDP)
-	in.Undervolt = cloneUndervolt(in.Undervolt)
-	if in.CPUPower != nil {
-		cpu := *in.CPUPower
-		in.CPUPower = &cpu
-	}
-	if in.PanelOverdrive != nil {
-		panel := *in.PanelOverdrive
-		in.PanelOverdrive = &panel
-	}
+	in.TDP = clonePtr(in.TDP)
+	in.Undervolt = clonePtr(in.Undervolt)
+	in.CPUPower = clonePtr(in.CPUPower)
+	in.PanelOverdrive = clonePtr(in.PanelOverdrive)
 	return in
 }
 
@@ -403,14 +380,6 @@ func clonePresetMap(in map[string]api.Preset) map[string]api.Preset {
 		out[name] = clonePreset(preset)
 	}
 	return out
-}
-
-func clonePowerPolicy(in *api.PowerPolicy) *api.PowerPolicy {
-	if in == nil {
-		return nil
-	}
-	out := *in
-	return &out
 }
 
 func (d *Daemon) setPowerPolicy(enabled bool, acPreset, batteryPreset string) error {
@@ -444,9 +413,10 @@ func (d *Daemon) setPowerPolicy(enabled bool, acPreset, batteryPreset string) er
 	}
 	applyNow := enabled && (current == nil || !current.Enabled)
 	if enabled && current != nil && current.Enabled {
-		if d.powerSource == cli.PowerSourceAC {
+		switch d.powerSource {
+		case cli.PowerSourceAC:
 			applyNow = applyNow || current.ACPreset != acPreset
-		} else if d.powerSource == cli.PowerSourceBattery {
+		case cli.PowerSourceBattery:
 			applyNow = applyNow || current.BatteryPreset != batteryPreset
 		}
 	}
@@ -506,7 +476,7 @@ func (d *Daemon) applyInitialPowerPolicy() bool {
 	}
 	d.mu.Lock()
 	d.powerSource = source
-	policy := clonePowerPolicy(d.state.PowerPolicy)
+	policy := clonePtr(d.state.PowerPolicy)
 	d.mu.Unlock()
 	if policy == nil || !policy.Enabled {
 		return false
@@ -546,7 +516,7 @@ func (d *Daemon) watchPowerPolicy(ctx context.Context) {
 			}
 			d.mu.Lock()
 			d.powerSource = source
-			policy := clonePowerPolicy(d.state.PowerPolicy)
+			policy := clonePtr(d.state.PowerPolicy)
 			activePreset := d.state.ActivePreset
 			d.mu.Unlock()
 			if source != observedSource {

@@ -1,12 +1,13 @@
-# z13ctl — Project Context for Claude
+# z13ctl-plus — Project Context for Claude
 
 ## What this project is
 
-`z13ctl` is a Linux CLI for controlling RGB lighting, fan curves, TDP (PPT power
-limits), and system settings on the 2025 ASUS ROG Flow Z13 via Linux hidraw,
-asus-wmi sysfs, and asus-armoury firmware-attributes interfaces.
-It uses the ASUS Aura HID protocol reverse-engineered from g-helper.
-Module path: `github.com/dahui/z13ctl`. Binary name: `z13ctl`. License: Apache 2.0.
+`z13ctl-plus` is a compatibility-preserving distribution of `dahui/z13ctl` for
+controlling RGB lighting, fan curves, TDP (PPT power limits), and system settings
+on the 2025 ASUS ROG Flow Z13. Repository and package identity:
+`github.com/aic0d3r/z13ctl-plus`. Canonical Go module path:
+`github.com/dahui/z13ctl`. Runtime binary, socket/state namespace, systemd units,
+and udev filenames remain `z13ctl`. License: Apache 2.0.
 
 ## Package layout
 
@@ -43,8 +44,8 @@ internal/
     cli.go                   package doc file only
     colors.go                named color table, ResolveColor, PrintColorList
     parse.go                 ParseColor, ParseBrightness
-    sysfs.go                 FindProfilePath, SetProfile, FindBatteryThresholdPath, FindBootSoundPath, SetBootSound, FindPanelOverdrivePath, SetPanelOverdrive, FindAPUTemperaturePath, ReadAPUTemperature, FindBatteryCapacityPath
-    fan.go                   hwmon discovery, fan curve read/write (both fans), RPM read, mode control, ParseFanCurve, SetAllFansFullSpeed
+    sysfs.go                 FindProfilePath, SetProfile, FindBatteryThresholdPath, FindBootSoundPath, SetBootSound, FindPanelOverdrivePath, SetPanelOverdrive, ReadAPUTemperature, FindBatteryCapacityPath
+    fan.go                   hwmon discovery, fan curve read/write (both fans), RPM read, mode control, ParseFanCurve
     tdp.go                   PPT sysfs helpers, safety constants (TDPMin/TDPMaxSafe/TDPMaxForced), ReadAllPPT, SetTDP, ResetTDP
     smu.go                   SMU sysfs communication: SMUAvailable, SMUProbeUndervolt, SendSMUCommand, response codes
     undervolt.go             Curve Optimizer commands: SetCurveOptimizer, ResetCurveOptimizer, ValidateCOValues, safety limits
@@ -63,7 +64,7 @@ internal/
     client.go                Redirect comment only — client functions live in api/
   hid/
     hid.go                   package doc file only
-    device.go                Device type, Write, SetFeature, Paths, Descriptions, Close
+    device.go                Device type, Write, Descriptions, Close
     scan.go                  FindDevice, ListDevices, sysfs discovery, hasAuraReport
     export_test.go           test-only exports: NewTestDevice, NewTestDeviceAnon,
                              UeventToDevPath, DeviceNameFromUevent
@@ -328,10 +329,13 @@ Default value in source is `"1.0.0-beta"` (used only in local builds without ldf
 Config: `.goreleaser.yml`. GitHub Actions workflow: `.github/workflows/release.yml`.
 - Builds for `linux/amd64` only (hidraw is Linux-specific; Z13 is x86_64).
 - `before.hooks`: `go mod tidy` only.
-- Archives include `LICENSE` and `contrib/systemd/**/*` (user + system unit files).
+- Release archives and packages are named `z13ctl-plus`; the binary inside is `z13ctl`.
+- Archives include `README.md`, `LICENSE`, `contrib/systemd/**/*`, and
+  `contrib/udev/*`.
 - `prerelease: auto` — tags with a pre-release suffix (e.g. `v1.0.0-beta`) are marked
   as pre-release on GitHub automatically.
-- To release: `git tag v1.0.0 && git push origin v1.0.0`
+- AUR publishing is manual (`workflow_dispatch`) and requires `AUR_KEY`.
+- To release: `git tag -a vX.Y.Z -F release-notes.md && git push origin vX.Y.Z`.
 
 ## Documentation
 
@@ -376,7 +380,8 @@ by the separate z13gui binary. Phase 2a changes:
 - `api/` submodule created with `State`, `LightingState` types and all `Send*`, `Subscribe` client functions
 - `internal/daemon/` refactored to use `api.State`/`api.LightingState`
 - `cmd/*.go` updated to call `api.Send*` directly
-- Multi-module dev setup: `go.work` (gitignored) + `replace` directive in `go.mod` for pre-publication
+- Multi-module dev setup: `go.work` (gitignored) + a retained local `replace`
+  directive so the plus binary uses its local API source.
 
 **z13gui** will be a separate repo (`github.com/dahui/z13gui`) using:
 - `github.com/diamondburned/gotk4` + `github.com/diamondburned/gotk4-layer-shell`
@@ -386,7 +391,7 @@ by the separate z13gui binary. Phase 2a changes:
   brightness/speed sliders, profile list, battery slider
 - Trigger: Armoury Crate button → daemon → `gui-toggle` subscribe event → show/hide drawer
 
-**Multi-module release workflow:**
-1. Tag `api/v1.0.0` → `git tag api/v1.0.0 && git push origin api/v1.0.0`
-2. Update `go.mod`: bump `require github.com/dahui/z13ctl/api v1.0.0`, remove `replace` directive
-3. Tag main module: `git tag v1.0.0 && git push origin v1.0.0`
+**Fork API release boundary:** Tags in `aic0d3r/z13ctl-plus` do not publish the
+canonical `github.com/dahui/z13ctl/api` module. External API changes must be
+merged and tagged upstream. Plus distribution releases use only annotated
+`vX.Y.Z` tags and retain the local `replace` directive.

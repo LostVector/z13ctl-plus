@@ -1,12 +1,5 @@
 # Installation
 
-!!! tip "Most users should also install z13gui"
-    z13ctl is the engine; **[z13gui](https://github.com/dahui/z13gui)** is the
-    recommended way to drive it for everyone except command-line veterans. It's
-    a touch-friendly graphical overlay covering every feature — lighting, fan
-    curves, TDP, undervolt, profiles, and battery limit. Install z13ctl first
-    (this page), then add z13gui (see [GUI Frontend](#gui-frontend) below).
-
 ## Prerequisites
 
 - Linux kernel with `hidraw` support (standard on all mainstream distributions)
@@ -28,14 +21,14 @@ return a helpful error explaining how to install the module.
 !!! warning "Strix Halo requires the amkillam fork"
     The original `leogx9r/ryzen_smu` does not support Strix Halo (the SoC in
     the 2025 Z13). You must use the
-    [amkillam/ryzen_smu](https://github.com/amkillam/ryzen_smu) fork. z13ctl
-    detects the wrong fork at startup and reports
+    [amkillam/ryzen_smu](https://github.com/amkillam/ryzen_smu) fork. The
+    `z13ctl` daemon shipped by z13ctl-plus detects the wrong fork at startup and reports
     undervolt as unavailable.
 
 | Distribution | Package | Source |
 |---|---|---|
 | Arch / CachyOS | `ryzen_smu-dkms-git` | AUR ([amkillam fork](https://github.com/amkillam/ryzen_smu)) |
-| Other distros | build from source | [github.com/amkillam/ryzen_smu](https://gi thub.com/amkillam/ryzen_smu) |
+| Other distros | build from source | [github.com/amkillam/ryzen_smu](https://github.com/amkillam/ryzen_smu) |
 
 ```sh
 # Arch / CachyOS
@@ -55,11 +48,11 @@ sudo make install
 === "Release binary"
 
     Download the latest `linux_amd64` archive from the
-    [Releases](https://github.com/dahui/z13ctl/releases) page, then extract
+    [Releases](https://github.com/aic0d3r/z13ctl-plus/releases) page, then extract
     and install:
 
     ```sh
-    tar xzf z13ctl_*_linux_amd64.tar.gz
+    tar xzf z13ctl-plus_*_linux_amd64.tar.gz
     sudo install -Dm755 z13ctl /usr/local/bin/z13ctl
     ```
 
@@ -85,11 +78,11 @@ sudo make install
 
 === "Arch Linux (AUR)"
 
-    Install the [z13ctl-bin](https://aur.archlinux.org/packages/z13ctl-bin)
+    Install the [z13ctl-plus-bin](https://aur.archlinux.org/packages/z13ctl-plus-bin)
     package with your preferred AUR helper:
 
     ```sh
-    yay -S z13ctl-bin
+    yay -S z13ctl-plus-bin
     ```
 
     The package installs the binary, udev rules, systemd units, and the
@@ -103,20 +96,20 @@ sudo make install
     Then log out and back in for the group membership to take effect.
 
     Alternatively, download the `.pkg.tar.zst` package directly from the
-    [Releases](https://github.com/dahui/z13ctl/releases) page and install with
+    [Releases](https://github.com/aic0d3r/z13ctl-plus/releases) page and install with
     pacman:
 
     ```sh
-    sudo pacman -U z13ctl-*.pkg.tar.zst
+    sudo pacman -U z13ctl-plus_*.pkg.tar.zst
     ```
 
 === "Debian / Ubuntu"
 
     Download the `.deb` package from the
-    [Releases](https://github.com/dahui/z13ctl/releases) page, then install:
+    [Releases](https://github.com/aic0d3r/z13ctl-plus/releases) page, then install:
 
     ```sh
-    sudo apt install ./z13ctl_*.deb
+    sudo apt install ./z13ctl-plus_*.deb
     ```
 
     The package installs the binary, udev rules, systemd units, and the
@@ -132,10 +125,10 @@ sudo make install
 === "Fedora / RHEL"
 
     Download the `.rpm` package from the
-    [Releases](https://github.com/dahui/z13ctl/releases) page, then install:
+    [Releases](https://github.com/aic0d3r/z13ctl-plus/releases) page, then install:
 
     ```sh
-    sudo dnf install ./z13ctl_*.rpm
+    sudo dnf install ./z13ctl-plus_*.rpm
     ```
 
     The package installs the binary, udev rules, systemd units, and the
@@ -153,14 +146,15 @@ sudo make install
     Requires Go 1.23 or later.
 
     ```sh
-    git clone https://github.com/dahui/z13ctl
-    cd z13ctl
+    git clone https://github.com/aic0d3r/z13ctl-plus
+    cd z13ctl-plus
     make build
     sudo make install
+    sudo z13ctl setup
     ```
 
-    `make install` installs the binary to `/usr/local/bin` and runs
-    `sudo z13ctl setup` automatically.
+    `make install` installs the compatible `z13ctl` binary to `/usr/local/bin`;
+    the separate setup command installs its udev rules and permissions service.
 
     Install the systemd user service:
 
@@ -184,7 +178,7 @@ If it prints nothing, see [Troubleshooting](#troubleshooting) below.
 ## GUI Frontend
 
 **Highly recommended for most users.** Install
-[z13gui](https://github.com/dahui/z13gui) alongside z13ctl — a touch-friendly
+[z13gui](https://github.com/dahui/z13gui) alongside z13ctl-plus — a touch-friendly
 GTK4 overlay that communicates with z13ctl through its daemon and exposes every
 feature graphically. While the raw `z13ctl` CLI is ideal for scripting and
 advanced tuning, beginners and anyone who prefers a point-and-tap interface will

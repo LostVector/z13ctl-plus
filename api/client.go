@@ -89,12 +89,45 @@ func sendCommand(req request) (bool, *response, error) {
 	return true, &resp, nil
 }
 
+func sendRequest(req request) (bool, error) {
+	handled, resp, err := sendCommand(req)
+	if !handled || err != nil {
+		return handled, err
+	}
+	if !resp.OK {
+		return true, fmt.Errorf("%s", resp.Error)
+	}
+	return true, nil
+}
+
+func sendValue(command string) (bool, string, error) {
+	handled, resp, err := sendCommand(request{Cmd: command})
+	if !handled || err != nil {
+		return handled, "", err
+	}
+	if !resp.OK {
+		return true, "", fmt.Errorf("%s", resp.Error)
+	}
+	return true, resp.Value, nil
+}
+
+func sendIntValue(command, label string) (handled bool, value int, err error) {
+	handled, raw, err := sendValue(command)
+	if !handled || err != nil {
+		return handled, 0, err
+	}
+	if _, scanErr := fmt.Sscan(raw, &value); scanErr != nil {
+		return true, 0, fmt.Errorf("invalid %s value %q: %w", label, raw, scanErr)
+	}
+	return true, value, nil
+}
+
 // SendApply sends an apply command to the daemon. color and color2 must be
 // "RRGGBB" hex strings. device may be "keyboard", "lightbar", a /dev/hidrawN
 // path, or "" to target all devices. Returns (true, nil) on success, (false,
 // nil) if the daemon is not running (caller should fall back to direct HID access).
 func SendApply(device, color, color2, mode, speed string, brightness int) (bool, error) {
-	handled, resp, err := sendCommand(request{
+	return sendRequest(request{
 		Cmd:        "apply",
 		Mode:       mode,
 		Color:      color,
@@ -103,130 +136,62 @@ func SendApply(device, color, color2, mode, speed string, brightness int) (bool,
 		Brightness: brightness,
 		Device:     device,
 	})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
 }
 
 // SendOff sends an off command to the daemon. device may be "keyboard",
 // "lightbar", a /dev/hidrawN path, or "" to target all devices.
 func SendOff(device string) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "off", Device: device})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "off", Device: device})
 }
 
 // SendBrightness sends a brightness-only command to the daemon. device may be
 // "keyboard", "lightbar", a /dev/hidrawN path, or "" to target all devices.
 func SendBrightness(device string, level int) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "brightness", Brightness: level, Device: device})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "brightness", Brightness: level, Device: device})
 }
 
 // SendProfileGet queries the daemon for the current performance profile by
 // reading sysfs (not cached daemon state). Intended for GUI/plugin callers.
 // Returns (false, "", nil) if the daemon is not running.
 func SendProfileGet() (handled bool, profile string, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "profile-get"})
-	if !handled || err != nil {
-		return handled, "", err
-	}
-	if !resp.OK {
-		return true, "", fmt.Errorf("%s", resp.Error)
-	}
-	return true, resp.Value, nil
+	return sendValue("profile-get")
 }
 
 // SendBatteryLimitGet queries the daemon for the current battery charge limit by
 // reading sysfs (not cached daemon state). Intended for GUI/plugin callers.
 // Returns (false, 0, nil) if the daemon is not running.
 func SendBatteryLimitGet() (handled bool, limit int, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "batterylimit-get"})
-	if !handled || err != nil {
-		return handled, 0, err
-	}
-	if !resp.OK {
-		return true, 0, fmt.Errorf("%s", resp.Error)
-	}
-	if _, scanErr := fmt.Sscan(resp.Value, &limit); scanErr != nil {
-		return true, 0, fmt.Errorf("invalid battery limit value %q: %w", resp.Value, scanErr)
-	}
-	return true, limit, nil
+	return sendIntValue("batterylimit-get", "battery limit")
 }
 
 // SendProfileSet sends a profile set command to the daemon.
 func SendProfileSet(profile string) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "profile", Set: profile})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "profile", Set: profile})
 }
 
 // SendBatteryLimitSet sends a battery limit set command to the daemon.
 func SendBatteryLimitSet(limit int) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "batterylimit", Set: fmt.Sprintf("%d", limit)})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "batterylimit", Set: fmt.Sprintf("%d", limit)})
 }
 
 // SendBootSoundSet sends a boot sound set command to the daemon.
 func SendBootSoundSet(value int) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "bootsound", Set: fmt.Sprintf("%d", value)})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "bootsound", Set: fmt.Sprintf("%d", value)})
 }
 
 // SendPanelOverdriveSet sends a panel overdrive set command to the daemon.
 func SendPanelOverdriveSet(value int) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "paneloverdrive", Set: fmt.Sprintf("%d", value)})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "paneloverdrive", Set: fmt.Sprintf("%d", value)})
 }
 
 // SendCPUMinFrequencySet sets the minimum CPU frequency for every cpufreq policy.
 func SendCPUMinFrequencySet(khz int) (bool, error) {
-	return sendSetting("cpu-min", strconv.Itoa(khz))
+	return sendRequest(request{Cmd: "cpu-min", Set: strconv.Itoa(khz)})
 }
 
 // SendCPUEPPSet sets the AMD energy performance preference for every CPU policy.
 func SendCPUEPPSet(value string) (bool, error) {
-	return sendSetting("cpu-epp", value)
+	return sendRequest(request{Cmd: "cpu-epp", Set: value})
 }
 
 // SendCPUBoostSet enables or disables CPU boost.
@@ -235,133 +200,59 @@ func SendCPUBoostSet(enabled bool) (bool, error) {
 	if enabled {
 		value = "1"
 	}
-	return sendSetting("cpu-boost", value)
+	return sendRequest(request{Cmd: "cpu-boost", Set: value})
 }
 
 // SendRefreshRateSet publishes an eDP-1 refresh request to the display
 // coordinator. Application is asynchronous and waits for current posture.
 func SendRefreshRateSet(hz int) (bool, error) {
-	return sendSetting("refresh-rate", strconv.Itoa(hz))
+	return sendRequest(request{Cmd: "refresh-rate", Set: strconv.Itoa(hz)})
 }
 
 // SendRefreshRateGet queries the daemon for the current eDP-1 refresh rate.
 // Returns (false, 0, nil) if the daemon is not running.
 func SendRefreshRateGet() (handled bool, hz int, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "refresh-rate-get"})
-	if !handled || err != nil {
-		return handled, 0, err
-	}
-	if !resp.OK {
-		return true, 0, fmt.Errorf("%s", resp.Error)
-	}
-	if _, scanErr := fmt.Sscan(resp.Value, &hz); scanErr != nil {
-		return true, 0, fmt.Errorf("invalid refresh rate value %q: %w", resp.Value, scanErr)
-	}
-	return true, hz, nil
-}
-
-func sendSetting(command, value string) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: command, Set: value})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendIntValue("refresh-rate-get", "refresh rate")
 }
 
 // SendBootSoundGet queries the daemon for the current boot sound setting by
 // reading sysfs. Returns (false, 0, nil) if the daemon is not running.
 func SendBootSoundGet() (handled bool, value int, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "bootsound-get"})
-	if !handled || err != nil {
-		return handled, 0, err
-	}
-	if !resp.OK {
-		return true, 0, fmt.Errorf("%s", resp.Error)
-	}
-	if _, scanErr := fmt.Sscan(resp.Value, &value); scanErr != nil {
-		return true, 0, fmt.Errorf("invalid boot sound value %q: %w", resp.Value, scanErr)
-	}
-	return true, value, nil
+	return sendIntValue("bootsound-get", "boot sound")
 }
 
 // SendPanelOverdriveGet queries the daemon for the current panel overdrive
 // setting by reading sysfs. Returns (false, 0, nil) if the daemon is not running.
 func SendPanelOverdriveGet() (handled bool, value int, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "paneloverdrive-get"})
-	if !handled || err != nil {
-		return handled, 0, err
-	}
-	if !resp.OK {
-		return true, 0, fmt.Errorf("%s", resp.Error)
-	}
-	if _, scanErr := fmt.Sscan(resp.Value, &value); scanErr != nil {
-		return true, 0, fmt.Errorf("invalid panel overdrive value %q: %w", resp.Value, scanErr)
-	}
-	return true, value, nil
+	return sendIntValue("paneloverdrive-get", "panel overdrive")
 }
 
 // SendFanCurveGet queries the daemon for the current fan curve data.
 // Returns JSON value string with both fans' curve and mode.
 func SendFanCurveGet() (handled bool, value string, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "fancurve-get"})
-	if !handled || err != nil {
-		return handled, "", err
-	}
-	if !resp.OK {
-		return true, "", fmt.Errorf("%s", resp.Error)
-	}
-	return true, resp.Value, nil
+	return sendValue("fancurve-get")
 }
 
 // SendFanCurveSet sends a fan curve set command to the daemon.
 // The curve is applied to both fans simultaneously.
 func SendFanCurveSet(curve string) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "fancurve", Set: curve})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "fancurve", Set: curve})
 }
 
 // SendFanCurveReset resets both fans to firmware auto mode.
 func SendFanCurveReset() (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "fancurve-reset"})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "fancurve-reset"})
 }
 
 // SendTdpGet queries the daemon for current TDP/PPT values.
 // Returns JSON value string.
 func SendTdpGet() (handled bool, value string, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "tdp-get"})
-	if !handled || err != nil {
-		return handled, "", err
-	}
-	if !resp.OK {
-		return true, "", fmt.Errorf("%s", resp.Error)
-	}
-	return true, resp.Value, nil
+	return sendValue("tdp-get")
 }
 
 // SendTdpSet sends a TDP set command to the daemon.
 func SendTdpSet(watts string, pl1, pl2, pl3 string, force bool) (bool, error) {
-	handled, resp, err := sendCommand(request{
+	return sendRequest(request{
 		Cmd:   "tdp",
 		Set:   watts,
 		PL1:   pl1,
@@ -369,103 +260,60 @@ func SendTdpSet(watts string, pl1, pl2, pl3 string, force bool) (bool, error) {
 		PL3:   pl3,
 		Force: force,
 	})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
 }
 
 // SendTdpReset sends a TDP reset command to the daemon.
 func SendTdpReset() (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "tdp-reset"})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "tdp-reset"})
 }
 
 // SendUndervoltGet queries the daemon for the current Curve Optimizer offsets.
 // Returns JSON value string. Returns (false, "", nil) if the daemon is not running.
 func SendUndervoltGet() (handled bool, value string, err error) {
-	var resp *response
-	handled, resp, err = sendCommand(request{Cmd: "undervolt-get"})
-	if !handled || err != nil {
-		return handled, "", err
-	}
-	if !resp.OK {
-		return true, "", fmt.Errorf("%s", resp.Error)
-	}
-	return true, resp.Value, nil
+	return sendValue("undervolt-get")
 }
 
 // SendUndervoltSet sends a Curve Optimizer set command to the daemon.
 // cpu is a string representation of the CO offset (e.g. "-20").
 func SendUndervoltSet(cpu string) (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "undervolt", Set: cpu})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "undervolt", Set: cpu})
 }
 
 // SendUndervoltReset resets Curve Optimizer to stock (0).
 func SendUndervoltReset() (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "undervolt-reset"})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "undervolt-reset"})
 }
 
 // SendTuningReset resets fan, TDP, and undervolt overrides while preserving
 // the physical profile, CPU power, display, and battery settings.
 func SendTuningReset() (bool, error) {
-	handled, resp, err := sendCommand(request{Cmd: "tuning-reset"})
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "tuning-reset"})
 }
 
 // SendPresetSave saves the daemon's current performance and display state as name.
 func SendPresetSave(name string) (bool, error) {
-	return sendPresetCommand(request{Cmd: "preset-save", Name: name})
+	return sendRequest(request{Cmd: "preset-save", Name: name})
 }
 
 // SendPresetApply applies a named preset.
 func SendPresetApply(name string) (bool, error) {
-	return sendPresetCommand(request{Cmd: "preset-apply", Name: name})
+	return sendRequest(request{Cmd: "preset-apply", Name: name})
 }
 
 // SendPresetDelete deletes a named preset that is not assigned by the power policy.
 func SendPresetDelete(name string) (bool, error) {
-	return sendPresetCommand(request{Cmd: "preset-delete", Name: name})
+	return sendRequest(request{Cmd: "preset-delete", Name: name})
 }
 
 // SendRestoreRecommended restores and applies the recommended power presets.
 func SendRestoreRecommended() (bool, error) {
-	return sendPresetCommand(request{Cmd: "restore-recommended"})
+	return sendRequest(request{Cmd: "restore-recommended"})
 }
 
 // SendPowerPolicySet configures automatic AC/battery preset switching. Empty
 // preset names preserve the current assignments (or select recommended defaults).
 func SendPowerPolicySet(enabled bool, acPreset, batteryPreset string) (bool, error) {
-	return sendPresetCommand(request{
+	return sendRequest(request{
 		Cmd:       "power-policy-set",
 		Enabled:   &enabled,
 		ACPreset:  acPreset,
@@ -476,24 +324,13 @@ func SendPowerPolicySet(enabled bool, acPreset, batteryPreset string) (bool, err
 // SendDisplayPosture publishes the current desktop, laptop, or tablet posture
 // to the daemon's display coordinator.
 func SendDisplayPosture(posture string) (bool, error) {
-	return sendPresetCommand(request{Cmd: "display-posture", Posture: posture})
+	return sendRequest(request{Cmd: "display-posture", Posture: posture})
 }
 
 // SendDisplayRotation publishes the desired tablet rotation to the daemon's
 // display coordinator.
 func SendDisplayRotation(rotation string) (bool, error) {
-	return sendPresetCommand(request{Cmd: "display-rotation", Rotation: rotation})
-}
-
-func sendPresetCommand(req request) (bool, error) {
-	handled, resp, err := sendCommand(req)
-	if !handled || err != nil {
-		return handled, err
-	}
-	if !resp.OK {
-		return true, fmt.Errorf("%s", resp.Error)
-	}
-	return true, nil
+	return sendRequest(request{Cmd: "display-rotation", Rotation: rotation})
 }
 
 // SendGetState fetches the daemon's full cached state for GUI initialization.

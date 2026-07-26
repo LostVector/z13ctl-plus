@@ -178,7 +178,7 @@ func ReadMemory() (used, total int, err error) {
 	if err != nil {
 		return 0, 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	var totalKB, availableKB int
 	var foundTotal, foundAvailable bool
@@ -304,7 +304,7 @@ func ReadCPUUtilization() (int, error) {
 	if err != nil {
 		return 0, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	scanner := bufio.NewScanner(f)
 	if !scanner.Scan() {

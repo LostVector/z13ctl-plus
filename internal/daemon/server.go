@@ -146,51 +146,30 @@ func (d *Daemon) dispatch(req request) response {
 	case "tuning-reset":
 		return d.handleTuningReset()
 	case "preset-save":
-		if err := d.savePreset(req.Name); err != nil {
-			return response{OK: false, Error: err.Error()}
-		}
-		return response{OK: true}
+		return responseFromError(d.savePreset(req.Name))
 	case "preset-apply":
-		if err := d.applyPreset(req.Name); err != nil {
-			return response{OK: false, Error: err.Error()}
-		}
-		return response{OK: true}
+		return responseFromError(d.applyPreset(req.Name))
 	case "preset-delete":
-		if err := d.deletePreset(req.Name); err != nil {
-			return response{OK: false, Error: err.Error()}
-		}
-		return response{OK: true}
+		return responseFromError(d.deletePreset(req.Name))
 	case "restore-recommended":
-		if err := d.restoreRecommended(); err != nil {
-			return response{OK: false, Error: err.Error()}
-		}
-		return response{OK: true}
+		return responseFromError(d.restoreRecommended())
 	case "power-policy-set":
 		if req.Enabled == nil {
 			return response{OK: false, Error: "power policy requires enabled"}
 		}
-		if err := d.setPowerPolicy(*req.Enabled, req.ACPreset, req.BatPreset); err != nil {
-			return response{OK: false, Error: err.Error()}
-		}
-		return response{OK: true}
+		return responseFromError(d.setPowerPolicy(*req.Enabled, req.ACPreset, req.BatPreset))
 	case "display-posture":
-		if err := d.setDisplayPosture(req.Posture); err != nil {
-			return response{OK: false, Error: err.Error()}
-		}
-		return response{OK: true}
+		return responseFromError(d.setDisplayPosture(req.Posture))
 	case "display-rotation":
-		if err := d.setDisplayRotation(req.Rotation); err != nil {
-			return response{OK: false, Error: err.Error()}
-		}
-		return response{OK: true}
+		return responseFromError(d.setDisplayRotation(req.Rotation))
 	case "get-state":
 		d.mu.Lock()
 		s := d.state
 		s.FanCurve = cloneFanCurve(d.state.FanCurve)
-		s.TDP = cloneTDP(d.state.TDP)
-		s.Undervolt = cloneUndervolt(d.state.Undervolt)
+		s.TDP = clonePtr(d.state.TDP)
+		s.Undervolt = clonePtr(d.state.Undervolt)
 		s.Presets = clonePresetMap(d.state.Presets)
-		s.PowerPolicy = clonePowerPolicy(d.state.PowerPolicy)
+		s.PowerPolicy = clonePtr(d.state.PowerPolicy)
 		d.mu.Unlock()
 		// Populate firmware-managed fields from sysfs (not cached in daemon state).
 		s.BootSound = readIntSysfs(cli.FindBootSoundPath())
@@ -240,6 +219,13 @@ func (d *Daemon) dispatch(req request) response {
 	default:
 		return response{OK: false, Error: "unknown command: " + req.Cmd}
 	}
+}
+
+func responseFromError(err error) response {
+	if err != nil {
+		return response{OK: false, Error: err.Error()}
+	}
+	return response{OK: true}
 }
 
 func commandNeedsApplyLock(cmd string) bool {
@@ -311,20 +297,20 @@ func (d *Daemon) handleRefreshRate(req request) response {
 // Reading from sysfs (not daemon state) ensures accurate values even if
 // the profile was changed by another process.
 func handleProfileGet() response {
-	data, err := os.ReadFile(cli.FindProfilePath())
+	value, err := readTrimmed(cli.FindProfilePath())
 	if err != nil {
 		return response{OK: false, Error: "reading profile: " + err.Error()}
 	}
-	return response{OK: true, Value: strings.TrimSpace(string(data))}
+	return response{OK: true, Value: value}
 }
 
 // handleBatteryLimitGet reads the current battery charge limit from sysfs.
 func handleBatteryLimitGet() response {
-	data, err := os.ReadFile(cli.FindBatteryThresholdPath())
+	value, err := readTrimmed(cli.FindBatteryThresholdPath())
 	if err != nil {
 		return response{OK: false, Error: "reading battery limit: " + err.Error()}
 	}
-	return response{OK: true, Value: strings.TrimSpace(string(data))}
+	return response{OK: true, Value: value}
 }
 
 func (d *Daemon) handleApply(req request) response {
@@ -533,11 +519,11 @@ func (d *Daemon) handleBatteryLimit(req request) response {
 }
 
 func handleBootSoundGet() response {
-	data, err := os.ReadFile(cli.FindBootSoundPath())
+	value, err := readTrimmed(cli.FindBootSoundPath())
 	if err != nil {
 		return response{OK: false, Error: "reading boot sound: " + err.Error()}
 	}
-	return response{OK: true, Value: strings.TrimSpace(string(data))}
+	return response{OK: true, Value: value}
 }
 
 func handleBootSound(req request) response {
@@ -553,11 +539,11 @@ func handleBootSound(req request) response {
 }
 
 func handlePanelOverdriveGet() response {
-	data, err := os.ReadFile(cli.FindPanelOverdrivePath())
+	value, err := readTrimmed(cli.FindPanelOverdrivePath())
 	if err != nil {
 		return response{OK: false, Error: "reading panel overdrive: " + err.Error()}
 	}
-	return response{OK: true, Value: strings.TrimSpace(string(data))}
+	return response{OK: true, Value: value}
 }
 
 func (d *Daemon) handlePanelOverdrive(req request) response {
@@ -580,17 +566,19 @@ func (d *Daemon) handlePanelOverdrive(req request) response {
 	return response{OK: true}
 }
 
-// readIntSysfs reads a sysfs file, trims whitespace, and parses it as an int.
-// Returns 0 on any error (file missing, unreadable, or non-numeric content).
-func readIntSysfs(path string) int {
+// readTrimmed reads a file and trims surrounding whitespace.
+func readTrimmed(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return 0
+		return "", err
 	}
-	v, err := strconv.Atoi(strings.TrimSpace(string(data)))
-	if err != nil {
-		return 0
-	}
+	return strings.TrimSpace(string(data)), nil
+}
+
+// readIntSysfs parses a sysfs integer, returning 0 on any error.
+func readIntSysfs(path string) int {
+	value, _ := readTrimmed(path)
+	v, _ := strconv.Atoi(value)
 	return v
 }
 
@@ -684,11 +672,8 @@ func handleTDPGet() response {
 
 // readProfileFromSysfs reads the current platform_profile value.
 func readProfileFromSysfs() string {
-	data, err := os.ReadFile(cli.FindProfilePath())
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
+	value, _ := readTrimmed(cli.FindProfilePath())
+	return value
 }
 
 func (d *Daemon) handleTDP(req request) response {
@@ -771,7 +756,7 @@ func (d *Daemon) handleTDP(req request) response {
 		}
 	}
 	d.mu.Lock()
-	d.state.TDP = cloneTDP(next.TDP)
+	d.state.TDP = clonePtr(next.TDP)
 	d.state.TDPActive = true
 	d.state.ActivePreset = ""
 	s := d.state

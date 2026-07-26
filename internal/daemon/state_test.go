@@ -44,6 +44,9 @@ func TestSaveAndLoadState_RoundTrip(t *testing.T) {
 	if got.Battery != s.Battery {
 		t.Errorf("Battery: got %d, want %d", got.Battery, s.Battery)
 	}
+	if got.Devices != nil {
+		t.Errorf("Devices should be nil for all-device state, got %v", got.Devices)
+	}
 }
 
 func TestSaveAndLoadState_WithDevices(t *testing.T) {
@@ -120,31 +123,6 @@ func TestLoadState_InvalidJSON(t *testing.T) {
 
 	if _, fresh, err := loadState(); err == nil || fresh {
 		t.Fatalf("invalid state load = fresh %t, err %v", fresh, err)
-	}
-}
-
-func TestLoadState_DevicesNilOnAllDeviceState(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-
-	// Saving a state with no Devices should load back with nil Devices.
-	s := api.State{
-		Lighting: api.LightingState{
-			Enabled: true, Mode: "static", Color: "FF00FF",
-			Color2: "000000", Speed: "normal", Brightness: 2,
-		},
-	}
-	if err := saveState(s); err != nil {
-		t.Fatalf("saveState: %v", err)
-	}
-	got, fresh, err := loadState()
-	if err != nil {
-		t.Fatal(err)
-	}
-	if fresh {
-		t.Fatal("saved state reported as fresh")
-	}
-	if got.Devices != nil {
-		t.Errorf("Devices should be nil for all-device state, got %v", got.Devices)
 	}
 }
 

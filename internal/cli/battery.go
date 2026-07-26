@@ -6,10 +6,8 @@ package cli
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"strconv"
-	"strings"
 
 	"github.com/dahui/z13ctl/api"
 )
@@ -25,12 +23,13 @@ const (
 // ReadBatteryState returns the live battery telemetry. Returns nil and an
 // error only if BAT0 cannot be found (no battery present).
 func ReadBatteryState() (*api.BatteryState, error) {
-	batPath, err := findBatteryDir()
-	if err != nil {
-		return nil, err
+	matches, _ := filepath.Glob(powerSupplyDir + "/BAT*")
+	if len(matches) == 0 {
+		return nil, fmt.Errorf("no battery found in %s", powerSupplyDir)
 	}
-	cap, _ := readInt(batPath + "/capacity")
-	status := readString(batPath + "/status")
+	batPath := matches[0]
+	capacity, _ := readIntFile(batPath + "/capacity")
+	status, _ := readTrimmed(batPath + "/status")
 	threshold := readIntSafe(batPath + "/charge_control_end_threshold")
 	powerMicroW := readIntSafe(batPath + "/power_now")
 	voltageMicroV := readIntSafe(batPath + "/voltage_now")
@@ -57,11 +56,11 @@ func ReadBatteryState() (*api.BatteryState, error) {
 	whDesignW := energyDesign / microwattsPerWatt
 
 	return &api.BatteryState{
-		CapacityPct:    cap,
+		CapacityPct:    capacity,
 		Status:         status,
 		HealthPct:      health,
-		PowerWatts:     formatWatts(powerMicroW),
-		VoltageVolts:   formatVolts(voltageMicroV),
+		PowerWatts:     formatMicro(powerMicroW),
+		VoltageVolts:   formatMicro(voltageMicroV),
 		ThresholdPct:   threshold,
 		Charging:       status == "Charging",
 		WhCurrent:      whCurrentW,
@@ -72,53 +71,15 @@ func ReadBatteryState() (*api.BatteryState, error) {
 	}, nil
 }
 
-// findBatteryDir locates the BAT* directory under /sys/class/power_supply.
-func findBatteryDir() (string, error) {
-	matches, err := filepath.Glob(powerSupplyDir + "/BAT*")
-	if err != nil {
-		return "", fmt.Errorf("scanning %s: %w", powerSupplyDir, err)
-	}
-	if len(matches) == 0 {
-		return "", fmt.Errorf("no battery found in %s", powerSupplyDir)
-	}
-	return matches[0], nil
-}
-
-func readInt(path string) (int, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return 0, err
-	}
-	return strconv.Atoi(strings.TrimSpace(string(data)))
-}
-
 func readIntSafe(path string) int {
-	v, _ := readInt(path)
+	v, _ := readIntFile(path)
 	return v
 }
 
-func readString(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
-}
-
-// formatWatts converts microwatts to "12.3" string. Returns "0" for 0/missing.
-func formatWatts(microW int) string {
-	if microW <= 0 {
+// formatMicro converts a value in millionths to one decimal place.
+func formatMicro(value int) string {
+	if value <= 0 {
 		return "0"
 	}
-	watts := float64(microW) / microwattsPerWatt
-	return strconv.FormatFloat(watts, 'f', 1, 64)
-}
-
-// formatVolts converts microvolts to "17.5" string.
-func formatVolts(microV int) string {
-	if microV <= 0 {
-		return "0"
-	}
-	volts := float64(microV) / 1_000_000
-	return strconv.FormatFloat(volts, 'f', 1, 64)
+	return strconv.FormatFloat(float64(value)/microwattsPerWatt, 'f', 1, 64)
 }

@@ -97,16 +97,17 @@ func migrateState(s *api.State, physicalProfile string) bool {
 	}
 
 	for name, preset := range s.Presets {
-		if preset.Profile == "custom" {
+		switch {
+		case preset.Profile == "custom":
 			preset.Profile = preset.BaseProfile
 			if !isPhysicalProfile(preset.Profile) {
 				preset.Profile = "balanced"
 			}
-		} else if isPhysicalProfile(preset.Profile) {
+		case isPhysicalProfile(preset.Profile):
 			preset.FanCurve = nil
 			preset.TDP = nil
 			preset.Undervolt = nil
-		} else {
+		default:
 			preset.Profile = "balanced"
 			preset.FanCurve = nil
 			preset.TDP = nil

@@ -18,6 +18,7 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -80,16 +81,7 @@ func ReadInternalDisplay() (InternalDisplayState, error) {
 	return state, nil
 }
 
-// parseCurrentRefresh finds the eDP-1 line marked with "*" (current mode)
-// and extracts the integer refresh rate.
-func parseCurrentRefresh(out []byte) int {
-	state, ok := parseInternalDisplay(out)
-	if !ok {
-		return 0
-	}
-	return state.Refresh
-}
-
+// parseInternalDisplay extracts the eDP-1 state and current mode.
 func parseInternalDisplay(out []byte) (InternalDisplayState, bool) {
 	out = regexp.MustCompile(`\x1b\[[0-9;]*m`).ReplaceAll(out, nil)
 	// kscreen-doctor marks the active mode with a trailing "*". Example:
@@ -97,7 +89,7 @@ func parseInternalDisplay(out []byte) (InternalDisplayState, bool) {
 	// We look for "@<digits>.<digits>*" inside a Modes: block.
 	// To stay robust if multiple outputs are connected, restrict to the
 	// eDP-1 output block.
-	re := regexp.MustCompile(`(?m)^Output:.*\b` + outputName + `\b.*\n(?s:.*?)(?:^Output:|\z)`)
+	re := regexp.MustCompile(`(?m)^Output:.*\b` + outputName + `\b.*\n(?s:.*?)(?:\nOutput:|\z)`)
 	block := re.Find(out)
 	if block == nil {
 		return InternalDisplayState{}, false
@@ -136,7 +128,7 @@ func ApplyInternalDisplay(scale float64, rotation string, hz int) error {
 		args = append(args, "output."+outputName+".rotation."+rotation)
 	}
 	if hz != 0 {
-		if !isSupportedRate(hz) {
+		if !slices.Contains(supportedRefreshRates, hz) {
 			return fmt.Errorf("unsupported refresh rate %d (valid: %v)", hz, supportedRefreshRates)
 		}
 		args = append(args, "output."+outputName+".mode."+fmt.Sprintf("%s@%d", nativeMode, hz))
@@ -190,15 +182,6 @@ func rotationName(value string) string {
 	default:
 		return ""
 	}
-}
-
-func isSupportedRate(hz int) bool {
-	for _, r := range supportedRefreshRates {
-		if r == hz {
-			return true
-		}
-	}
-	return false
 }
 
 func suffixNonEmpty(s string) string {

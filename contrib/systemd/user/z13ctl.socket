@@ -1,5 +1,5 @@
 [Unit]
-Description=z13ctl control socket
+Description=z13ctl-plus control socket
 
 [Socket]
 ListenStream=%t/z13ctl/z13ctl.sock

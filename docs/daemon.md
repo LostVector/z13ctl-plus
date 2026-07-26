@@ -28,7 +28,7 @@ persistence.
 
 ## Systemd setup (recommended)
 
-z13ctl ships two systemd user units that use socket activation:
+z13ctl-plus ships two `z13ctl` systemd user units that use socket activation:
 
 - **`z13ctl.socket`** — systemd creates and manages the Unix socket. The daemon
   is started on first use and does not run if nothing has connected.

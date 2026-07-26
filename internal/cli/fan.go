@@ -30,14 +30,8 @@ const (
 	HighTDPMinPWM = 204
 )
 
-// fanNames maps internal fan names to their hwmon index (1 or 2).
-var fanNames = [fanCount]struct {
-	name  string
-	index int
-}{
-	{"fan1", 1},
-	{"fan2", 2},
-}
+// fanIndices are the hwmon fan indexes.
+var fanIndices = [fanCount]int{1, 2}
 
 // FindFanHwmonPath returns the sysfs hwmon directory whose name attribute
 // matches the given value. Returns "" if not found. hwmon numbers are
@@ -78,10 +72,10 @@ func ReadBothFanRPM() ([fanCount]int, error) {
 		return [fanCount]int{}, fmt.Errorf("hwmon device %q not found", hwmonNameReadings)
 	}
 	var rpms [fanCount]int
-	for i, f := range fanNames {
-		v, err := readIntFile(dir + "/" + fmt.Sprintf("fan%d_input", f.index))
+	for i, f := range fanIndices {
+		v, err := readIntFile(dir + "/" + fmt.Sprintf("fan%d_input", f))
 		if err != nil {
-			return rpms, fmt.Errorf("reading fan%d RPM: %w", f.index, err)
+			return rpms, fmt.Errorf("reading fan%d RPM: %w", f, err)
 		}
 		rpms[i] = v
 	}
@@ -96,10 +90,10 @@ func ReadBothFanModes() ([fanCount]int, error) {
 		return [fanCount]int{}, fmt.Errorf("hwmon device %q not found", hwmonNameCurves)
 	}
 	var modes [fanCount]int
-	for i, f := range fanNames {
-		v, err := readIntFile(dir + "/" + fmt.Sprintf("pwm%d_enable", f.index))
+	for i, f := range fanIndices {
+		v, err := readIntFile(dir + "/" + fmt.Sprintf("pwm%d_enable", f))
 		if err != nil {
-			return modes, fmt.Errorf("reading fan%d mode: %w", f.index, err)
+			return modes, fmt.Errorf("reading fan%d mode: %w", f, err)
 		}
 		modes[i] = v
 	}
@@ -113,16 +107,16 @@ func ReadBothFanCurves() ([fanCount][]api.FanCurvePoint, error) {
 		return [fanCount][]api.FanCurvePoint{}, fmt.Errorf("hwmon device %q not found", hwmonNameCurves)
 	}
 	var curves [fanCount][]api.FanCurvePoint
-	for fi, f := range fanNames {
+	for fi, f := range fanIndices {
 		points := make([]api.FanCurvePoint, fanCurvePoints)
 		for i := range fanCurvePoints {
-			temp, err := readIntFile(dir + "/" + fmt.Sprintf("pwm%d_auto_point%d_temp", f.index, i+1))
+			temp, err := readIntFile(dir + "/" + fmt.Sprintf("pwm%d_auto_point%d_temp", f, i+1))
 			if err != nil {
-				return curves, fmt.Errorf("reading fan%d curve point %d temp: %w", f.index, i+1, err)
+				return curves, fmt.Errorf("reading fan%d curve point %d temp: %w", f, i+1, err)
 			}
-			pwm, err := readIntFile(dir + "/" + fmt.Sprintf("pwm%d_auto_point%d_pwm", f.index, i+1))
+			pwm, err := readIntFile(dir + "/" + fmt.Sprintf("pwm%d_auto_point%d_pwm", f, i+1))
 			if err != nil {
-				return curves, fmt.Errorf("reading fan%d curve point %d pwm: %w", f.index, i+1, err)
+				return curves, fmt.Errorf("reading fan%d curve point %d pwm: %w", f, i+1, err)
 			}
 			points[i] = api.FanCurvePoint{Temp: temp, PWM: pwm}
 		}
@@ -141,56 +135,34 @@ func SetBothFanCurves(points []api.FanCurvePoint) error {
 	if dir == "" {
 		return fmt.Errorf("hwmon device %q not found", hwmonNameCurves)
 	}
-	for _, f := range fanNames {
+	for _, f := range fanIndices {
 		for i, p := range points {
-			if err := writeIntFile(dir+"/"+fmt.Sprintf("pwm%d_auto_point%d_temp", f.index, i+1), p.Temp); err != nil {
-				return fmt.Errorf("writing fan%d curve point %d temp: %w", f.index, i+1, err)
+			if err := writeIntFile(dir+"/"+fmt.Sprintf("pwm%d_auto_point%d_temp", f, i+1), p.Temp); err != nil {
+				return fmt.Errorf("writing fan%d curve point %d temp: %w", f, i+1, err)
 			}
-			if err := writeIntFile(dir+"/"+fmt.Sprintf("pwm%d_auto_point%d_pwm", f.index, i+1), p.PWM); err != nil {
-				return fmt.Errorf("writing fan%d curve point %d pwm: %w", f.index, i+1, err)
+			if err := writeIntFile(dir+"/"+fmt.Sprintf("pwm%d_auto_point%d_pwm", f, i+1), p.PWM); err != nil {
+				return fmt.Errorf("writing fan%d curve point %d pwm: %w", f, i+1, err)
 			}
 		}
 	}
 	return setAllFanModes(1) // enable custom mode on both
 }
 
-// setFanMode writes pwm_enable for a single fan (by index).
-// Mode 0 (full-speed) is only supported by the base "asus" hwmon device;
-// the "asus_custom_fan_curve" device rejects it with EINVAL.
-// Modes 1 (custom) and 2 (auto) are written to the curve device first,
-// then synced to the readings device.
-func setFanMode(idx, mode int) error {
-	file := fmt.Sprintf("pwm%d_enable", idx)
-
-	if mode == 0 {
-		// Full-speed: only the base "asus" hwmon device supports pwm_enable=0.
-		readDir := FindFanReadingsHwmonPath()
-		if readDir == "" {
-			return fmt.Errorf("hwmon device %q not found", hwmonNameReadings)
-		}
-		return writeIntFile(readDir+"/"+file, mode)
-	}
-
-	// Custom (1) or auto (2): write to curve device first, then sync readings.
+// setAllFanModes writes custom or auto mode to the curve device for both fans,
+// then syncs the readings device when available.
+func setAllFanModes(mode int) error {
 	curveDir := FindFanCurveHwmonPath()
 	if curveDir == "" {
 		return fmt.Errorf("hwmon device %q not found", hwmonNameCurves)
 	}
-	if err := writeIntFile(curveDir+"/"+file, mode); err != nil {
-		return fmt.Errorf("setting fan mode on %s: %w", hwmonNameCurves, err)
-	}
 	readDir := FindFanReadingsHwmonPath()
-	if readDir != "" {
-		_ = writeIntFile(readDir+"/"+file, mode)
-	}
-	return nil
-}
-
-// setAllFanModes writes pwm_enable for both fans.
-func setAllFanModes(mode int) error {
-	for _, f := range fanNames {
-		if err := setFanMode(f.index, mode); err != nil {
-			return err
+	for _, idx := range fanIndices {
+		file := fmt.Sprintf("pwm%d_enable", idx)
+		if err := writeIntFile(curveDir+"/"+file, mode); err != nil {
+			return fmt.Errorf("setting fan mode on %s: %w", hwmonNameCurves, err)
+		}
+		if readDir != "" {
+			_ = writeIntFile(readDir+"/"+file, mode)
 		}
 	}
 	return nil
@@ -199,18 +171,6 @@ func setAllFanModes(mode int) error {
 // ResetAllFanCurves restores firmware auto mode for both fans.
 func ResetAllFanCurves() error {
 	return setAllFanModes(2) // auto/firmware
-}
-
-// SetAllFansFullSpeed forces both fans to maximum speed.
-// Only the base "asus" hwmon device supports pwm_enable=0, and only pwm1_enable
-// is functional — pwm2_enable returns EIO on writes. Writing pwm1_enable=0
-// is sufficient to force both physical fans to full speed.
-func SetAllFansFullSpeed() error {
-	readDir := FindFanReadingsHwmonPath()
-	if readDir == "" {
-		return fmt.Errorf("hwmon device %q not found", hwmonNameReadings)
-	}
-	return writeIntFile(readDir+"/pwm1_enable", 0)
 }
 
 // HighTDPFanCurve returns an 8-point fan curve with a minimum PWM of 80%,
@@ -227,60 +187,6 @@ func HighTDPFanCurve() []api.FanCurvePoint {
 		{Temp: 75, PWM: 250},
 		{Temp: 80, PWM: 255},
 	}
-}
-
-// FanPresetNames is the ordered list of named fan curve presets exposed in the UI.
-// "custom" is excluded — it represents user-edited curves.
-var fanPresetNames = []string{"silent", "balanced", "turbo"}
-
-// FanPresetNames returns the ordered list of preset names. Callers should not
-// mutate the returned slice.
-func FanPresetNames() []string {
-	return append([]string(nil), fanPresetNames...)
-}
-
-// FanCurvePreset returns the 8-point fan curve for the named preset.
-// Returns nil for unknown presets.
-func FanCurvePreset(name string) []api.FanCurvePoint {
-	switch name {
-	case "silent":
-		// Quiet: fans off until 50°C, gentle ramp, max at 90°C.
-		return []api.FanCurvePoint{
-			{Temp: 25, PWM: 0},
-			{Temp: 40, PWM: 0},
-			{Temp: 50, PWM: 13},
-			{Temp: 60, PWM: 38},
-			{Temp: 70, PWM: 76},
-			{Temp: 80, PWM: 128},
-			{Temp: 85, PWM: 178},
-			{Temp: 90, PWM: 255},
-		}
-	case "balanced":
-		// Moderate ramp through the usable range.
-		return []api.FanCurvePoint{
-			{Temp: 30, PWM: 13},
-			{Temp: 45, PWM: 25},
-			{Temp: 55, PWM: 51},
-			{Temp: 65, PWM: 89},
-			{Temp: 75, PWM: 140},
-			{Temp: 82, PWM: 191},
-			{Temp: 88, PWM: 229},
-			{Temp: 95, PWM: 255},
-		}
-	case "turbo":
-		// Aggressive: 30% baseline, max by 80°C.
-		return []api.FanCurvePoint{
-			{Temp: 30, PWM: 76},
-			{Temp: 45, PWM: 128},
-			{Temp: 55, PWM: 178},
-			{Temp: 65, PWM: 216},
-			{Temp: 75, PWM: 242},
-			{Temp: 80, PWM: 255},
-			{Temp: 85, PWM: 255},
-			{Temp: 90, PWM: 255},
-		}
-	}
-	return nil
 }
 
 // ParseFanCurve parses a fan curve string "temp:pwm,temp:pwm,..." into a

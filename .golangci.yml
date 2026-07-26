@@ -2,9 +2,6 @@ version: "2"
 
 linters:
   enable:
-    - errcheck      # unchecked error returns
-    - govet         # go vet checks (shadow, printf, etc.)
-    - staticcheck   # comprehensive static analysis
     - misspell      # common spelling mistakes in comments/strings
     - revive        # idiomatic Go style (golint successor)
     - gocritic      # opinionated but practical checks

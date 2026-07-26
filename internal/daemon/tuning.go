@@ -31,7 +31,7 @@ type tuningPlan struct {
 func planTuning(state api.State) tuningPlan {
 	plan := tuningPlan{}
 	if state.TDPActive && state.TDP != nil {
-		plan.TDP = cloneTDP(state.TDP)
+		plan.TDP = clonePtr(state.TDP)
 		plan.FanSafety = state.TDP.PL1SPL > cli.TDPMaxSafe
 	}
 	if plan.FanSafety {
@@ -40,7 +40,7 @@ func planTuning(state api.State) tuningPlan {
 		plan.Fan = cloneFanCurve(state.FanCurve)
 	}
 	if state.UndervoltActive && state.Undervolt != nil {
-		plan.Undervolt = cloneUndervolt(state.Undervolt)
+		plan.Undervolt = clonePtr(state.Undervolt)
 	}
 	return plan
 }
@@ -80,8 +80,8 @@ func (d *Daemon) commitTuningState(next api.State, activePreset string) error {
 	d.mu.Lock()
 	d.state.Profile = next.Profile
 	d.state.FanCurve = cloneFanCurve(next.FanCurve)
-	d.state.TDP = cloneTDP(next.TDP)
-	d.state.Undervolt = cloneUndervolt(next.Undervolt)
+	d.state.TDP = clonePtr(next.TDP)
+	d.state.Undervolt = clonePtr(next.Undervolt)
 	d.state.FanCurveActive = next.FanCurveActive
 	d.state.TDPActive = next.TDPActive
 	d.state.UndervoltActive = next.UndervoltActive

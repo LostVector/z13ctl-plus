@@ -72,29 +72,9 @@ func TestWrite_FullBuffer(t *testing.T) {
 	}
 }
 
-func TestPaths(t *testing.T) {
-	t.Parallel()
-	_, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev := hid.NewTestDevice(w)
-	defer dev.Close()
-
-	paths := dev.Paths()
-	if len(paths) != 1 || paths[0] != "test" {
-		t.Errorf("Paths() = %v, want [\"test\"]", paths)
-	}
-}
-
 func TestDescriptions_Named(t *testing.T) {
 	t.Parallel()
-	_, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev := hid.NewTestDevice(w)
-	defer dev.Close()
+	dev, _ := pipeDevice(t)
 
 	descs := dev.Descriptions()
 	if len(descs) != 1 || descs[0] != "test (test)" {
@@ -119,11 +99,7 @@ func TestDescriptions_Anon(t *testing.T) {
 
 func TestClose_Safe(t *testing.T) {
 	t.Parallel()
-	_, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev := hid.NewTestDevice(w)
+	dev, _ := pipeDevice(t)
 	// Double-close should not panic.
 	dev.Close()
 	dev.Close()
@@ -131,12 +107,7 @@ func TestClose_Safe(t *testing.T) {
 
 func TestFilteredView_EmptyReturnsAll(t *testing.T) {
 	t.Parallel()
-	_, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev := hid.NewTestDevice(w)
-	defer dev.Close()
+	dev, _ := pipeDevice(t)
 
 	view, err := dev.FilteredView("")
 	if err != nil {
@@ -149,33 +120,23 @@ func TestFilteredView_EmptyReturnsAll(t *testing.T) {
 
 func TestFilteredView_MatchByName(t *testing.T) {
 	t.Parallel()
-	_, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev := hid.NewTestDevice(w) // name = "test", path = "test"
-	defer dev.Close()
+	dev, _ := pipeDevice(t)
 
 	view, err := dev.FilteredView("test")
 	if err != nil {
 		t.Fatalf("FilteredView(\"test\") error: %v", err)
 	}
-	paths := view.Paths()
-	if len(paths) != 1 || paths[0] != "test" {
-		t.Errorf("FilteredView(\"test\").Paths() = %v, want [\"test\"]", paths)
+	descriptions := view.Descriptions()
+	if len(descriptions) != 1 || descriptions[0] != "test (test)" {
+		t.Errorf("FilteredView(\"test\").Descriptions() = %v, want [\"test (test)\"]", descriptions)
 	}
 }
 
 func TestFilteredView_NoMatch(t *testing.T) {
 	t.Parallel()
-	_, w, err := os.Pipe()
-	if err != nil {
-		t.Fatal(err)
-	}
-	dev := hid.NewTestDevice(w)
-	defer dev.Close()
+	dev, _ := pipeDevice(t)
 
-	_, err = dev.FilteredView("lightbar")
+	_, err := dev.FilteredView("lightbar")
 	if err == nil {
 		t.Error("FilteredView(\"lightbar\") should return error when no match")
 	}

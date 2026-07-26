@@ -126,12 +126,12 @@ func DryRunFanCurve(points []api.FanCurvePoint) {
 	if curveDir == "" {
 		curveDir = "<hwmon not found>"
 	}
-	for _, f := range fanNames {
+	for _, f := range fanIndices {
 		for i, p := range points {
-			fmt.Printf("Would write %d to %s/pwm%d_auto_point%d_temp\n", p.Temp, curveDir, f.index, i+1)
-			fmt.Printf("Would write %d to %s/pwm%d_auto_point%d_pwm\n", p.PWM, curveDir, f.index, i+1)
+			fmt.Printf("Would write %d to %s/pwm%d_auto_point%d_temp\n", p.Temp, curveDir, f, i+1)
+			fmt.Printf("Would write %d to %s/pwm%d_auto_point%d_pwm\n", p.PWM, curveDir, f, i+1)
 		}
-		fmt.Printf("Would write 1 (custom) to %s/pwm%d_enable\n", curveDir, f.index)
+		fmt.Printf("Would write 1 (custom) to %s/pwm%d_enable\n", curveDir, f)
 	}
 }
 
@@ -142,8 +142,8 @@ func DryRunFanCurveReset() {
 	if curveDir == "" {
 		curveDir = "<hwmon not found>"
 	}
-	for _, f := range fanNames {
-		fmt.Printf("Would write 2 (auto) to %s/pwm%d_enable\n", curveDir, f.index)
+	for _, f := range fanIndices {
+		fmt.Printf("Would write 2 (auto) to %s/pwm%d_enable\n", curveDir, f)
 	}
 }
 
@@ -162,7 +162,7 @@ func DryRunTdp(watts, pl1, pl2, pl3 int, force bool) {
 	if force && (pl1 > TDPMaxSafe || pl2 > TDPMaxSafe || pl3 > TDPMaxSafe) {
 		fmt.Println("Would set all fans to full speed (pwm_enable=0) for thermal safety")
 	}
-	base := FindPPTBasePath()
+	base := pptBasePath
 	fmt.Printf("Would write %d to %s/ppt_pl1_spl\n", pl1, base)
 	fmt.Printf("Would write %d to %s/ppt_pl2_sppt\n", pl2, base)
 	fmt.Printf("Would write %d to %s/ppt_fppt\n", pl3, base)

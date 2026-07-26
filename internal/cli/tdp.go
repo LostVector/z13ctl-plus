@@ -6,7 +6,6 @@ package cli
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/dahui/z13ctl/api"
 )
@@ -17,7 +16,7 @@ const (
 	TDPMin       = 5  // absolute minimum
 	TDPMaxSafe   = 75 // max in Armoury Crate custom mode
 	TDPMaxForced = 93 // absolute max for GZ302E (G-Helper)
-	TDPDefault   = 50 // G-Helper default for Z13
+	pptBasePath  = "/sys/devices/platform/asus-nb-wmi"
 )
 
 // StockProfilePPT maps stock platform_profile names to their actual PPT values
@@ -46,50 +45,26 @@ func ReadEffectivePPT(profile string) (api.TDPState, error) {
 	return s, nil
 }
 
-// FindPPTBasePath returns the sysfs path to the asus-nb-wmi platform device.
-func FindPPTBasePath() string {
-	const path = "/sys/devices/platform/asus-nb-wmi"
-	if _, err := os.Stat(path); err == nil {
-		return path
-	}
-	return path // return default even if missing, callers handle errors
-}
-
-// FindPPTPath returns the full sysfs path for a specific PPT attribute.
-func FindPPTPath(attr string) string {
-	return FindPPTBasePath() + "/" + attr
-}
-
-// ReadPPT reads a single PPT value (watts) from sysfs.
-func ReadPPT(attr string) (int, error) {
-	return readIntFile(FindPPTPath(attr))
-}
-
 // ReadAllPPT reads all 5 PPT values and returns a TDPState.
 func ReadAllPPT() (api.TDPState, error) {
 	var s api.TDPState
 	var err error
-	if s.PL1SPL, err = ReadPPT("ppt_pl1_spl"); err != nil {
+	if s.PL1SPL, err = readIntFile(pptBasePath + "/ppt_pl1_spl"); err != nil {
 		return s, fmt.Errorf("reading ppt_pl1_spl: %w", err)
 	}
-	if s.PL2SPPT, err = ReadPPT("ppt_pl2_sppt"); err != nil {
+	if s.PL2SPPT, err = readIntFile(pptBasePath + "/ppt_pl2_sppt"); err != nil {
 		return s, fmt.Errorf("reading ppt_pl2_sppt: %w", err)
 	}
-	if s.FPPT, err = ReadPPT("ppt_fppt"); err != nil {
+	if s.FPPT, err = readIntFile(pptBasePath + "/ppt_fppt"); err != nil {
 		return s, fmt.Errorf("reading ppt_fppt: %w", err)
 	}
-	if s.APUSPPT, err = ReadPPT("ppt_apu_sppt"); err != nil {
+	if s.APUSPPT, err = readIntFile(pptBasePath + "/ppt_apu_sppt"); err != nil {
 		return s, fmt.Errorf("reading ppt_apu_sppt: %w", err)
 	}
-	if s.PlatformSPPT, err = ReadPPT("ppt_platform_sppt"); err != nil {
+	if s.PlatformSPPT, err = readIntFile(pptBasePath + "/ppt_platform_sppt"); err != nil {
 		return s, fmt.Errorf("reading ppt_platform_sppt: %w", err)
 	}
 	return s, nil
-}
-
-// WritePPT writes a single PPT value (watts) to sysfs.
-func WritePPT(attr string, watts int) error {
-	return writeIntFile(FindPPTPath(attr), watts)
 }
 
 // SetTDP writes all PPT values. pl1/pl2/pl3 override the unified watts value
@@ -104,22 +79,20 @@ func SetTDP(watts, pl1, pl2, pl3 int) error {
 	if pl3 == 0 {
 		pl3 = watts
 	}
-	if err := WritePPT("ppt_pl1_spl", pl1); err != nil {
+	if err := writeIntFile(pptBasePath+"/ppt_pl1_spl", pl1); err != nil {
 		return fmt.Errorf("writing ppt_pl1_spl: %w", err)
 	}
-	if err := WritePPT("ppt_pl2_sppt", pl2); err != nil {
+	if err := writeIntFile(pptBasePath+"/ppt_pl2_sppt", pl2); err != nil {
 		return fmt.Errorf("writing ppt_pl2_sppt: %w", err)
 	}
-	if err := WritePPT("ppt_fppt", pl3); err != nil {
+	if err := writeIntFile(pptBasePath+"/ppt_fppt", pl3); err != nil {
 		return fmt.Errorf("writing ppt_fppt: %w", err)
 	}
-	if err := WritePPT("ppt_apu_sppt", pl2); err != nil {
+	if err := writeIntFile(pptBasePath+"/ppt_apu_sppt", pl2); err != nil {
 		return fmt.Errorf("writing ppt_apu_sppt: %w", err)
 	}
-	if err := WritePPT("ppt_platform_sppt", pl2); err != nil {
+	if err := writeIntFile(pptBasePath+"/ppt_platform_sppt", pl2); err != nil {
 		return fmt.Errorf("writing ppt_platform_sppt: %w", err)
 	}
 	return nil
 }
-
-

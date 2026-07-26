@@ -27,7 +27,7 @@ var (
 )
 
 func buildRulesContent(group string) string {
-	return fmt.Sprintf(`# 99-z13ctl.rules — ASUS ROG Flow Z13 device access
+	return fmt.Sprintf(`# 99-z13ctl.rules — z13ctl-plus ASUS ROG Flow Z13 device access
 #
 # Grants members of the %s group read/write access to:
 #   - ASUS HID devices used for keyboard and lightbar RGB control
@@ -61,7 +61,7 @@ ACTION=="add", SUBSYSTEM=="platform", KERNEL=="asus-nb-wmi", RUN+="/bin/sh -c 'f
 //   - ryzen_smu_drv files: kobject under /sys/kernel/, not a udev device
 func buildServiceContent(group string) string {
 	return fmt.Sprintf(`[Unit]
-Description=z13ctl sysfs permissions (battery + firmware-attributes + PPT + CPU power + ryzen_smu)
+Description=z13ctl-plus sysfs permissions (battery + firmware-attributes + PPT + CPU power + ryzen_smu)
 # charge_control_end_threshold on BAT0 is created by asus_nb_wmi late in probe(),
 # after all observable udev child-device events. udev RUN+= cannot catch it.
 # firmware-attributes current_value files may be created after the parent ADD event.
@@ -87,121 +87,63 @@ WantedBy=multi-user.target
 // applies chgrp/chmod immediately (dryRun=false) or prints what would be done
 // (dryRun=true). Errors are silently skipped for missing/inaccessible paths.
 func applySysfsPerms(group string, dryRun bool) {
-	chgrpChmod := func(p, mode string) {
+	chgrpChmod := func(path, mode string) {
 		if dryRun {
-			fmt.Printf("  chgrp %s %s && chmod %s %s\n", group, p, mode, p)
+			fmt.Printf("  chgrp %s %s && chmod %s %s\n", group, path, mode, path)
 			return
 		}
-		_ = exec.Command("chgrp", group, p).Run()
-		_ = exec.Command("chmod", mode, p).Run()
+		_ = exec.Command("chgrp", group, path).Run()
+		_ = exec.Command("chmod", mode, path).Run()
+	}
+	applyMatches := func(pattern, mode string) {
+		matches, _ := filepath.Glob(pattern)
+		for _, path := range matches {
+			chgrpChmod(path, mode)
+		}
 	}
 
-	for _, class := range []struct {
-		dir  string
-		attr string
-	}{
-		{"/sys/class/platform-profile", "profile"},
-		{"/sys/class/power_supply", "charge_control_end_threshold"},
+	for _, pattern := range []string{
+		"/sys/class/platform-profile/*/profile",
+		"/sys/class/power_supply/*/charge_control_end_threshold",
+		"/sys/class/firmware-attributes/asus-armoury/attributes/boot_sound/current_value",
+		"/sys/class/firmware-attributes/asus-armoury/attributes/panel_overdrive/current_value",
 	} {
-		entries, err := os.ReadDir(class.dir)
+		applyMatches(pattern, "g+w")
+	}
+
+	// hwmon permissions depend on the device name.
+	hwmonDirs, _ := filepath.Glob("/sys/class/hwmon/*")
+	for _, dir := range hwmonDirs {
+		nameBytes, err := os.ReadFile(dir + "/name")
 		if err != nil {
 			continue
 		}
-		for _, e := range entries {
-			p := class.dir + "/" + e.Name() + "/" + class.attr
-			if _, err := os.Stat(p); err != nil {
-				continue
-			}
-			chgrpChmod(p, "g+w")
+		switch strings.TrimSpace(string(nameBytes)) {
+		case "asus_custom_fan_curve":
+			applyMatches(dir+"/pwm*", "g+w")
+		case "asus":
+			applyMatches(dir+"/pwm*_enable", "g+w")
 		}
 	}
 
-	// Firmware-attributes (asus-armoury): boot_sound, panel_overdrive.
-	for _, attr := range []string{"boot_sound", "panel_overdrive"} {
-		p := "/sys/class/firmware-attributes/asus-armoury/attributes/" + attr + "/current_value"
-		if _, err := os.Stat(p); err != nil {
-			continue
-		}
-		chgrpChmod(p, "g+w")
-	}
-
-	// hwmon fan curve attributes: scan by name for the correct hwmon device.
-	hwmonEntries, hwErr := os.ReadDir("/sys/class/hwmon")
-	if hwErr == nil {
-		for _, e := range hwmonEntries {
-			namePath := "/sys/class/hwmon/" + e.Name() + "/name"
-			nameBytes, rErr := os.ReadFile(namePath)
-			if rErr != nil {
-				continue
-			}
-			name := strings.TrimSpace(string(nameBytes))
-			hwBase := "/sys/class/hwmon/" + e.Name()
-			switch name {
-			case "asus_custom_fan_curve":
-				// All pwm* files (curve points + pwm_enable).
-				pwmFiles, _ := os.ReadDir(hwBase)
-				for _, f := range pwmFiles {
-					if strings.HasPrefix(f.Name(), "pwm") {
-						chgrpChmod(hwBase+"/"+f.Name(), "g+w")
-					}
-				}
-			case "asus":
-				// Only pwm*_enable files (fan mode control).
-				pwmFiles, _ := os.ReadDir(hwBase)
-				for _, f := range pwmFiles {
-					if strings.HasPrefix(f.Name(), "pwm") && strings.HasSuffix(f.Name(), "_enable") {
-						chgrpChmod(hwBase+"/"+f.Name(), "g+w")
-					}
-				}
-			}
-		}
-	}
-
-	// PPT power limit attributes (asus-nb-wmi).
-	pptFiles, pptErr := os.ReadDir("/sys/devices/platform/asus-nb-wmi")
-	if pptErr == nil {
-		for _, f := range pptFiles {
-			if strings.HasPrefix(f.Name(), "ppt_") {
-				chgrpChmod("/sys/devices/platform/asus-nb-wmi/"+f.Name(), "g+w")
-			}
-		}
-	}
-
-	// CPU minimum frequency, EPP, and boost controls.
 	for _, pattern := range []string{
+		"/sys/devices/platform/asus-nb-wmi/ppt_*",
 		"/sys/devices/system/cpu/cpufreq/boost",
 		"/sys/devices/system/cpu/cpufreq/policy*/scaling_min_freq",
 		"/sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference",
+		"/sys/kernel/ryzen_smu_drv/smu_args",
+		"/sys/kernel/ryzen_smu_drv/mp1_smu_cmd",
+		"/sys/kernel/ryzen_smu_drv/rsmu_cmd",
 	} {
-		matches, _ := filepath.Glob(pattern)
-		for _, p := range matches {
-			chgrpChmod(p, "g+w")
-		}
+		applyMatches(pattern, "g+w")
 	}
 
-	// ryzen_smu sysfs files for Curve Optimizer (undervolt).
-	if _, smuErr := os.Stat("/sys/kernel/ryzen_smu_drv"); smuErr == nil {
-		for _, attr := range []string{"smu_args", "mp1_smu_cmd", "rsmu_cmd"} {
-			p := "/sys/kernel/ryzen_smu_drv/" + attr
-			if _, err := os.Stat(p); err != nil {
-				continue
-			}
-			chgrpChmod(p, "g+w")
-		}
-	}
-
-	// Scan for Armoury Crate button input device (Asus WMI hotkeys).
-	entries, err := os.ReadDir("/sys/class/input")
-	if err == nil {
-		for _, e := range entries {
-			namePath := "/sys/class/input/" + e.Name() + "/device/name"
-			nameBytes, err := os.ReadFile(namePath)
-			if err != nil {
-				continue
-			}
-			if strings.TrimSpace(string(nameBytes)) == "Asus WMI hotkeys" {
-				chgrpChmod("/dev/input/"+e.Name(), "g+rw")
-			}
+	// Scan for the Armoury Crate button input device (Asus WMI hotkeys).
+	inputDirs, _ := filepath.Glob("/sys/class/input/*")
+	for _, dir := range inputDirs {
+		nameBytes, err := os.ReadFile(dir + "/device/name")
+		if err == nil && strings.TrimSpace(string(nameBytes)) == "Asus WMI hotkeys" {
+			chgrpChmod("/dev/input/"+filepath.Base(dir), "g+rw")
 		}
 	}
 }

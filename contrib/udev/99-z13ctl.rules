@@ -1,4 +1,4 @@
-# 99-z13ctl.rules — ASUS ROG Flow Z13 device access
+# 99-z13ctl.rules — z13ctl-plus ASUS ROG Flow Z13 device access
 #
 # Grants members of the users group read/write access to:
 #   - ASUS HID devices used for keyboard and lightbar RGB control

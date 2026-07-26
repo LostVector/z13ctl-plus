@@ -48,9 +48,9 @@ func TestCPUPowerReadAndWrite(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, policy := range []string{"policy0", "policy1"} {
-		min, err := readTrimmed(filepath.Join(base, policy, "scaling_min_freq"))
-		if err != nil || min != "625000" {
-			t.Fatalf("%s minimum frequency = %q, %v", policy, min, err)
+		minFreq, err := readTrimmed(filepath.Join(base, policy, "scaling_min_freq"))
+		if err != nil || minFreq != "625000" {
+			t.Fatalf("%s minimum frequency = %q, %v", policy, minFreq, err)
 		}
 		epp, err := readTrimmed(filepath.Join(base, policy, "energy_performance_preference"))
 		if err != nil || epp != "balance_power" {

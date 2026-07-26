@@ -1,6 +1,6 @@
 # Quick Start
 
-These examples assume you have [installed z13ctl](installation.md) and run
+These examples assume you have [installed z13ctl-plus](installation.md) and run
 `sudo z13ctl setup`. The daemon does not need to be running — commands fall
 back to direct hardware access automatically. See [Daemon](daemon.md) for why
 you probably want the daemon running anyway.
@@ -223,4 +223,4 @@ This prints a live swatch table in your terminal. Any 6-digit hex value
 - [Daemon](daemon.md) — set up the daemon for state persistence, boot
   restore, and sleep/resume recovery
 - [z13gui](https://github.com/dahui/z13gui) — graphical interface for all
-  z13ctl features (touch-friendly GTK4 overlay)
+  z13ctl-plus features (touch-friendly GTK4 overlay)

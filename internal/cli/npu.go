@@ -117,16 +117,11 @@ func findNPUDevice() string {
 	return npuDevicePath
 }
 
-// NPUAvailable returns true if an AMD XDNA NPU is bound to the amdxdna driver.
-func NPUAvailable() bool {
-	return findNPUDevice() != ""
-}
-
 // npuQuery issues DRM_AMDXDNA_GET_INFO with the given param. The driver
 // writes the actual response size back into req.bufferSize; we return that
 // trimmed slice. Starts with a generous buffer (16 sensors worth) and retries
 // once if the driver signals it needs more space.
-func npuQuery(param uint32, minBytes int) ([]byte, error) {
+func npuQuery(param uint32) ([]byte, error) {
 	path := findNPUDevice()
 	if path == "" {
 		return nil, fmt.Errorf("amdxdna NPU not found")
@@ -135,12 +130,9 @@ func npuQuery(param uint32, minBytes int) ([]byte, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
-	size := minBytes
-	if size < 16*amdxdnaSensorSize {
-		size = 16 * amdxdnaSensorSize
-	}
+	size := 16 * amdxdnaSensorSize
 	for range 2 {
 		buf := make([]byte, size)
 		req := amdxdnaDrmGetInfo{
@@ -174,7 +166,7 @@ func npuQuery(param uint32, minBytes int) ([]byte, error) {
 //
 // Power is reported with sub-watt precision (the driver exposes mW).
 func ReadNPUSensors() (powerW float64, utilPct int, err error) {
-	payload, err := npuQuery(drmAmdxdnaQuerySensors, 0)
+	payload, err := npuQuery(drmAmdxdnaQuerySensors)
 	if err != nil {
 		return 0, 0, err
 	}
@@ -207,7 +199,7 @@ func ReadNPUSensors() (powerW float64, utilPct int, err error) {
 // at max (1267 MHz) whenever any process holds /dev/accel/accelN open, so
 // the value may appear static — but it is not metadata.
 func ReadNPUClockMHz() (int, error) {
-	payload, err := npuQuery(drmAmdxdnaQueryClockMetadata, amdxdnaClockMDSize)
+	payload, err := npuQuery(drmAmdxdnaQueryClockMetadata)
 	if err != nil {
 		return 0, err
 	}
