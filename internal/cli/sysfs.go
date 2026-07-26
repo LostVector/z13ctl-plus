@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 )
@@ -92,15 +93,7 @@ func setPPD(asusProfile string) {
 // lists name in its choices file.
 func profileDeviceSupports(base, name string) bool {
 	data, err := os.ReadFile(base + "/choices")
-	if err != nil {
-		return false
-	}
-	for _, p := range strings.Fields(string(data)) {
-		if p == name {
-			return true
-		}
-	}
-	return false
+	return err == nil && slices.Contains(strings.Fields(string(data)), name)
 }
 
 // profileNameForDevice returns the appropriate profile name for a given device,
@@ -149,24 +142,14 @@ func SetPanelOverdrive(value int) error {
 	return os.WriteFile(FindPanelOverdrivePath(), []byte(strconv.Itoa(value)+"\n"), 0o644)
 }
 
-// FindAPUTemperaturePath returns the sysfs path for the APU temperature sensor.
-// Uses the k10temp hwmon device (AMD Ryzen thermal sensor, label "Tctl").
-func FindAPUTemperaturePath() string {
-	dir := FindFanHwmonPath("k10temp")
-	if dir == "" {
-		return ""
-	}
-	return dir + "/temp1_input"
-}
-
-// ReadAPUTemperature reads the current APU die temperature in degrees Celsius.
+// ReadAPUTemperature reads the current APU die temperature from k10temp.
 // The k10temp driver reports millidegrees; this function converts to whole degrees.
 func ReadAPUTemperature() (int, error) {
-	path := FindAPUTemperaturePath()
-	if path == "" {
+	dir := FindFanHwmonPath("k10temp")
+	if dir == "" {
 		return 0, fmt.Errorf("k10temp hwmon device not found")
 	}
-	milli, err := readIntFile(path)
+	milli, err := readIntFile(dir + "/temp1_input")
 	if err != nil {
 		return 0, fmt.Errorf("reading APU temperature: %w", err)
 	}

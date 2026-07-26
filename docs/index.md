@@ -1,14 +1,18 @@
-# z13ctl
+# z13ctl-plus
 
 RGB lighting, performance profiles, battery limit, fan curves, TDP control,
 CPU undervolting, and display settings for the **2025 ASUS ROG Flow Z13**
 on Linux.
 
-[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/dahui/z13ctl/blob/main/LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/aic0d3r/z13ctl-plus/blob/main/LICENSE)
+
+`z13ctl-plus` is a compatibility-preserving distribution of
+[`dahui/z13ctl`](https://github.com/dahui/z13ctl). It installs the `z13ctl`
+command and retains the canonical `github.com/dahui/z13ctl/api` Go API.
 
 ---
 
-## What z13ctl does
+## What z13ctl-plus does
 
 - **RGB lighting** — set color, mode, speed, and brightness on the keyboard backlight
   and edge lightbar, independently or together
@@ -34,11 +38,11 @@ automatically when the detachable keyboard is removed and reattached.
 !!! tip "New to Linux? Use the GUI"
     Most users — especially those newer to Linux — should install
     **[z13gui](https://github.com/dahui/z13gui)**, a touch-friendly GTK4 overlay
-    that controls every z13ctl feature (lighting, fan curves, TDP, undervolt,
+    that controls every z13ctl-plus feature (lighting, fan curves, TDP, undervolt,
     profiles, battery limit) through the daemon — no command line required. The
     raw `z13ctl` CLI is great for scripting and advanced tuning, but if you're
     not a Linux veteran you'll have a far smoother experience with the GUI.
-    Install z13gui alongside z13ctl for the full experience.
+    Install z13gui alongside z13ctl-plus for the full experience.
 
 ---
 
@@ -49,7 +53,7 @@ OpenRGB does not support this model. asusctl does not work with it.
 rogauracore only controls the keyboard backlight. HHD works on Bazzite kernels
 but requires out-of-tree patches that reduce performance on CachyOS.
 
-z13ctl implements the Aura HID protocol directly against the Linux `hidraw`
+z13ctl-plus implements the Aura HID protocol directly against the Linux `hidraw`
 interface — no kernel patches, no external daemons. The protocol was
 reverse-engineered from [g-helper](https://github.com/seerge/g-helper) (MIT).
 A full protocol specification is available in the [Protocol Reference](protocol.md).
@@ -68,7 +72,7 @@ A full protocol specification is available in the [Protocol Reference](protocol.
 
 ## Next steps
 
-Head to the [Installation](installation.md) guide to get z13ctl on your system,
+Head to the [Installation](installation.md) guide to get z13ctl-plus on your system,
 then follow the [Quick Start](getting-started.md) to configure lighting, fan
 curves, and performance profiles. For the full CLI reference, see
 [Commands](commands.md).

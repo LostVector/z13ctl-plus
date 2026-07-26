@@ -16,12 +16,8 @@ import (
 
 const smuDriverPath = "/sys/kernel/ryzen_smu_drv"
 
-// SMU mailbox identifiers. Each corresponds to a sysfs file that accepts
-// binary command IDs and returns binary response codes.
-const (
-	MailboxMP1  = "mp1_smu_cmd" // MP1 mailbox
-	MailboxRSMU = "rsmu_cmd"    // RSMU/PSMU mailbox (used for Curve Optimizer)
-)
+// MailboxMP1 is the MP1 sysfs mailbox used for SMU commands.
+const MailboxMP1 = "mp1_smu_cmd"
 
 // SMU response codes returned by the firmware after a command.
 const (

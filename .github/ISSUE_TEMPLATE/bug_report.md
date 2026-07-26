@@ -1,6 +1,6 @@
 ---
 name: Bug Report
-about: Report a problem with z13ctl
+about: Report a problem with z13ctl-plus
 labels: bug
 ---
 
@@ -21,7 +21,7 @@ What actually happened. Include any error messages or unexpected output.
 **Environment**
 - Linux distribution and version:
 - Kernel version (`uname -r`):
-- z13ctl version (`z13ctl --version`):
+- z13ctl-plus version (`z13ctl --version`):
 - ASUS ROG Flow Z13 model year:
 - Running as daemon or direct:
 

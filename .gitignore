@@ -37,8 +37,5 @@ release-notes.md
 # .idea/
 .vscode/
 .claude/
-
-
 # Generated documentation artifacts
-docs/api-reference.md
 site/

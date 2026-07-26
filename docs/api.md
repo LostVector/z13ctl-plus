@@ -13,6 +13,11 @@ import "github.com/dahui/z13ctl/api"
 The module is deliberately stdlib-only (no third-party dependencies) so that
 integrations can pull it in without inheriting the CLI's dependency tree.
 
+!!! note "Canonical upstream module"
+    z13ctl-plus intentionally retains the upstream module path for compatibility.
+    Tagging the plus repository does not republish `github.com/dahui/z13ctl/api`;
+    externally consumable API changes must be released by the upstream project.
+
 It is a separate Go module at `./api` with its own `go.mod`. If you are working
 on both the main binary and the API library simultaneously, create a
 [go.work](https://go.dev/ref/mod#workspaces) file:
@@ -82,6 +87,11 @@ handled, err          := api.SendProfileSet("performance")
 handled, err := api.SendBootSoundSet(0)
 handled, err := api.SendPanelOverdriveSet(1)
 
+// Live AMD P-State controls
+handled, err := api.SendCPUMinFrequencySet(625000) // kHz
+handled, err := api.SendCPUEPPSet("balance_power")
+handled, err := api.SendCPUBoostSet(false)
+
 // Fan curves (applied to both fans simultaneously)
 handled, value, err := api.SendFanCurveGet()
 handled, err         := api.SendFanCurveSet("48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102")
@@ -96,6 +106,16 @@ handled, err         := api.SendTdpReset()
 handled, value, err := api.SendUndervoltGet()
 handled, err         := api.SendUndervoltSet("-20")  // CPU CO -20
 handled, err         := api.SendUndervoltReset()
+
+// Reset fan, TDP, and undervolt overrides together
+handled, err := api.SendTuningReset()
+
+// Named power presets and automatic source switching
+handled, err := api.SendPresetSave("Daily")
+handled, err := api.SendPresetApply("Daily")
+handled, err := api.SendPresetDelete("Daily")
+handled, err := api.SendRestoreRecommended()
+handled, err := api.SendPowerPolicySet(true, "Plugged In", "On Battery")
 ```
 
 **Full state snapshot (for GUI initialization):**
@@ -107,9 +127,14 @@ if handled && err == nil {
     fmt.Println("profile:", state.Profile)
     fmt.Println("battery limit:", state.Battery)
     fmt.Println("fan curve:", state.FanCurve)
+    fmt.Println("fan override active:", state.FanCurveActive)
+    fmt.Println("fan safety active:", state.FanSafetyActive)
     fmt.Println("tdp:", state.TDP)
+    fmt.Println("tdp override active:", state.TDPActive)
     fmt.Println("undervolt:", state.Undervolt)
+    fmt.Println("undervolt override active:", state.UndervoltActive)
     fmt.Println("undervolt available:", state.UndervoltAvailable)
+    fmt.Println("CPU power:", state.CPUPower)
     fmt.Println("APU temp:", state.Temperature, "°C")
     fmt.Println("fan RPM:", state.FanRPM)
 }
@@ -128,9 +153,7 @@ for event := range ch {
 }
 ```
 
----
-
 ## Full API reference
 
-See the [API Reference](api-reference.md) page for full documentation
-of all exported types and functions.
+See [pkg.go.dev](https://pkg.go.dev/github.com/dahui/z13ctl/api) for full
+documentation of all exported types and functions.

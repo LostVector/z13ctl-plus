@@ -6,6 +6,6 @@
 //
 // File layout:
 //
-//	device.go — Device type, known device table, Write/SetFeature/Close methods
+//	device.go — Device type, known device table, Write/Close methods
 //	scan.go   — FindDevice, ListDevices, sysfs helpers, Aura report verification
 package hid

@@ -1,6 +1,6 @@
 version: 2
 
-project_name: z13ctl
+project_name: z13ctl-plus
 
 before:
   hooks:
@@ -22,28 +22,33 @@ archives:
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
       - LICENSE
+      - README.md
       - contrib/systemd/**/*
-      - contrib/udev/**/*
+      - contrib/udev/*
 
 checksum:
   name_template: "checksums.txt"
 
 nfpms:
   - id: z13ctl-pkg
-    package_name: z13ctl
+    package_name: z13ctl-plus
     section: utils
     formats:
       - archlinux
       - deb
       - rpm
-    homepage: https://github.com/dahui/z13ctl
-    maintainer: "Jeff Hagadorn <noreply@github.com>"
-    description: CLI and daemon for ASUS ROG Flow Z13 hardware control
+    homepage: https://github.com/aic0d3r/z13ctl-plus
+    maintainer: "aic0d3r <funforfreeapps@gmail.com>"
+    description: z13ctl-plus CLI and daemon for ASUS ROG Flow Z13 hardware control
     license: Apache-2.0
     dependencies:
       - systemd
       - dbus
     provides:
+      - z13ctl
+    conflicts:
+      - z13ctl
+    replaces:
       - z13ctl
     scripts:
       postinstall: contrib/nfpm/postinstall.sh
@@ -51,7 +56,7 @@ nfpms:
       postremove: contrib/nfpm/postremove.sh
     contents:
       - src: LICENSE
-        dst: /usr/share/licenses/z13ctl/LICENSE
+        dst: /usr/share/licenses/z13ctl-plus/LICENSE
       - src: contrib/systemd/user/z13ctl.socket
         dst: /usr/lib/systemd/user/z13ctl.socket
       - src: contrib/systemd/user/z13ctl.service
@@ -61,7 +66,7 @@ nfpms:
       - src: contrib/udev/99-z13ctl.rules
         dst: /usr/lib/udev/rules.d/99-z13ctl.rules
     archlinux:
-      packager: "Jeff Hagadorn <noreply@github.com>"
+      packager: "aic0d3r <funforfreeapps@gmail.com>"
     overrides:
       archlinux:
         suggests:
@@ -70,6 +75,9 @@ nfpms:
       group: Applications/System
 
 release:
+  github:
+    owner: aic0d3r
+    name: z13ctl-plus
   draft: false
   prerelease: auto
   # The annotated tag's message body becomes the top of the release notes,
@@ -78,3 +86,9 @@ release:
   # Lightweight tags (no -a/-m) leave this empty and fall back to the changelog.
   header: |
     {{ .TagBody }}
+
+    ---
+
+    **z13ctl-plus** is a compatibility-preserving distribution of
+    [dahui/z13ctl](https://github.com/dahui/z13ctl). The installed command and
+    runtime interfaces remain `z13ctl`.

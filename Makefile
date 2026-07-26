@@ -59,7 +59,8 @@ uninstall-service:
 install-perms-service:
 	install -Dm644 contrib/systemd/system/z13ctl-perms.service $(SYSTEMD_SYSTEM_DIR)/z13ctl-perms.service
 	systemctl daemon-reload
-	systemctl enable --now z13ctl-perms.service
+	systemctl enable z13ctl-perms.service
+	systemctl restart z13ctl-perms.service
 	@echo "Permissions service installed. Run 'systemctl status z13ctl-perms' to verify."
 
 ## uninstall-perms-service: remove the sysfs permissions service (requires sudo)
@@ -69,9 +70,8 @@ uninstall-perms-service:
 	systemctl daemon-reload
 	@echo "Permissions service removed."
 
-## docs: generate API reference and serve mkdocs locally
+## docs: serve mkdocs locally
 docs:
-	go run github.com/princjef/gomarkdoc/cmd/gomarkdoc@latest ./api/... > docs/api-reference.md
 	mkdocs serve
 
 ## clean: remove all generated build and test artifacts

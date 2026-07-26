@@ -5,23 +5,12 @@ package hid
 import (
 	"fmt"
 	"os"
-	"syscall"
-	"unsafe"
 )
 
 const (
-	// HIDIOCSFEATURE(len): _IOWR('H', 0x06, len) for len=64
-	hidiocsfeature64 = 0xC0404806
-
 	// ReportSize is the fixed 64-byte output report length used by all Aura commands.
 	ReportSize = 64
 )
-
-// deviceSpec maps a HID_ID uevent value to a human-readable device name.
-type deviceSpec struct {
-	hidID string
-	name  string
-}
 
 // knownDevices lists all ASUS HID devices that carry Aura (report 0x5d).
 // On the 2025 ROG Flow Z13:
@@ -30,9 +19,9 @@ type deviceSpec struct {
 //	0x1a30 = GZ302EA-Keyboard → keyboard
 //
 // g-helper's AsusHid.Write() broadcasts to ALL matching devices; we do the same.
-var knownDevices = []deviceSpec{
-	{"HID_ID=0003:00000B05:000018C6", "lightbar"},
-	{"HID_ID=0003:00000B05:00001A30", "keyboard"},
+var knownDevices = map[string]string{
+	"HID_ID=0003:00000B05:000018C6": "lightbar",
+	"HID_ID=0003:00000B05:00001A30": "keyboard",
 }
 
 // hidrawNode is one open hidraw file.
@@ -67,34 +56,6 @@ func (d *Device) Write(data []byte) error {
 		}
 	}
 	return lastErr
-}
-
-// SetFeature sends a 64-byte feature report via ioctl HIDIOCSFEATURE to every node.
-func (d *Device) SetFeature(data []byte) error {
-	buf := make([]byte, ReportSize)
-	copy(buf, data)
-	var lastErr error
-	for _, n := range d.nodes {
-		_, _, errno := syscall.Syscall(
-			syscall.SYS_IOCTL,
-			n.f.Fd(),
-			hidiocsfeature64,
-			uintptr(unsafe.Pointer(&buf[0])),
-		)
-		if errno != 0 {
-			lastErr = fmt.Errorf("HIDIOCSFEATURE on %s: errno %d", n.path, errno)
-		}
-	}
-	return lastErr
-}
-
-// Paths returns the raw device paths (e.g. /dev/hidraw0).
-func (d *Device) Paths() []string {
-	paths := make([]string, len(d.nodes))
-	for i, n := range d.nodes {
-		paths[i] = n.path
-	}
-	return paths
 }
 
 // Descriptions returns human-readable device descriptions: "path (name)".

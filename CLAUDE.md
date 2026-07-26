@@ -1,12 +1,13 @@
-# z13ctl — Project Context for Claude
+# z13ctl-plus — Project Context for Claude
 
 ## What this project is
 
-`z13ctl` is a Linux CLI for controlling RGB lighting, fan curves, TDP (PPT power
-limits), and system settings on the 2025 ASUS ROG Flow Z13 via Linux hidraw,
-asus-wmi sysfs, and asus-armoury firmware-attributes interfaces.
-It uses the ASUS Aura HID protocol reverse-engineered from g-helper.
-Module path: `github.com/dahui/z13ctl`. Binary name: `z13ctl`. License: Apache 2.0.
+`z13ctl-plus` is a compatibility-preserving distribution of `dahui/z13ctl` for
+controlling RGB lighting, fan curves, TDP (PPT power limits), and system settings
+on the 2025 ASUS ROG Flow Z13. Repository and package identity:
+`github.com/aic0d3r/z13ctl-plus`. Canonical Go module path:
+`github.com/dahui/z13ctl`. Runtime binary, socket/state namespace, systemd units,
+and udev filenames remain `z13ctl`. License: Apache 2.0.
 
 ## Package layout
 
@@ -24,7 +25,9 @@ cmd/                         Cobra subcommands
   daemon.go                  start the daemon (z13ctl daemon)
   list.go                    list hidraw devices
   off.go                     turn lighting off
-  profile.go                 get/set performance profile (platform_profile sysfs); "custom" virtual profile
+  profile.go                 get/set physical performance profile (platform_profile sysfs)
+  preset.go                  named presets + automatic AC/battery assignment CLI
+  display.go                 posture/rotation intent publisher for shared KScreen coordinator
   batterylimit.go            get/set battery charge limit (power_supply sysfs)
   bootsound.go               get/set POST boot sound (asus-armoury firmware-attributes)
   paneloverdrive.go          get/set panel refresh overdrive (asus-armoury firmware-attributes)
@@ -41,8 +44,8 @@ internal/
     cli.go                   package doc file only
     colors.go                named color table, ResolveColor, PrintColorList
     parse.go                 ParseColor, ParseBrightness
-    sysfs.go                 FindProfilePath, SetProfile, FindBatteryThresholdPath, FindBootSoundPath, SetBootSound, FindPanelOverdrivePath, SetPanelOverdrive, FindAPUTemperaturePath, ReadAPUTemperature, FindBatteryCapacityPath
-    fan.go                   hwmon discovery, fan curve read/write (both fans), RPM read, mode control, ParseFanCurve, SetAllFansFullSpeed
+    sysfs.go                 FindProfilePath, SetProfile, FindBatteryThresholdPath, FindBootSoundPath, SetBootSound, FindPanelOverdrivePath, SetPanelOverdrive, ReadAPUTemperature, FindBatteryCapacityPath
+    fan.go                   hwmon discovery, fan curve read/write (both fans), RPM read, mode control, ParseFanCurve
     tdp.go                   PPT sysfs helpers, safety constants (TDPMin/TDPMaxSafe/TDPMaxForced), ReadAllPPT, SetTDP, ResetTDP
     smu.go                   SMU sysfs communication: SMUAvailable, SMUProbeUndervolt, SendSMUCommand, response codes
     undervolt.go             Curve Optimizer commands: SetCurveOptimizer, ResetCurveOptimizer, ValidateCOValues, safety limits
@@ -54,12 +57,14 @@ internal/
     state.go                 XDG state file persistence (uses api.State/api.LightingState)
     button.go                evdev button watcher (KEY_PROG3 / Armoury Crate button on 2025 Z13)
     hotplug.go               detachable-keyboard reattach watcher (polls sysfs, reopens HID + restores lighting)
+    preset.go                named preset capture/apply and AC/battery policy watcher
+    display.go               serialized/coalescing internal-panel display coordinator
     server.go                JSON request handler; handleConn(), dispatch(), command handlers
     resume.go                DBus logind PrepareForSleep watcher; turns off lightbar on sleep, restores lighting + volatile state on resume
     client.go                Redirect comment only — client functions live in api/
   hid/
     hid.go                   package doc file only
-    device.go                Device type, Write, SetFeature, Paths, Descriptions, Close
+    device.go                Device type, Write, Descriptions, Close
     scan.go                  FindDevice, ListDevices, sysfs discovery, hasAuraReport
     export_test.go           test-only exports: NewTestDevice, NewTestDeviceAnon,
                              UeventToDevPath, DeviceNameFromUevent
@@ -96,8 +101,19 @@ contrib/
   `WantedBy=graphical-session.target` (works in both desktop and Steam Gaming Mode).
   Logging goes to journald via stdout/stderr.
 - **State persistence**: `$XDG_STATE_HOME/z13ctl/state.json` (atomic write via temp +
-  rename). Daemon restores lighting, fan curves, and TDP on start. Fan curves and
-  TDP are only restored when `profile == "custom"` (stock profiles let firmware manage).
+  rename). `State.Profile` is always the physical profile; fan, TDP, and undervolt
+  overrides have independent persisted active flags and are restored independently.
+- **Named presets and power policy**: Presets independently capture profile,
+  fan/TDP/undervolt, CPU min/EPP/boost, panel overdrive, and refresh rate. The
+  daemon polls external `power_supply` devices and applies assigned AC/battery
+  presets only at startup or a real source transition; manual overrides last
+  until the next transition. Refresh intent is handled by the shared display
+  coordinator rather than issuing independent KScreen writes.
+- **Shared display coordinator**: z13ctl is the sole KScreen writer for the
+  z13ctl + z13-tablet-kit integration. Tablet-kit publishes posture/rotation;
+  presets publish refresh intent. The daemon coalesces them into one
+  internal-panel transaction, never touches external outputs, waits 10 seconds
+  after desktop/dock posture, and skips writes while eDP-1 is disabled.
 - **Button watcher**: Finds "Asus WMI hotkeys" input device by sysfs name
   (`/sys/class/input/*/device/name`), opens it, grabs it exclusively with EVIOCGRAB,
   and listens for KEY_PROG3 (code 202) key-down events. KEY_PROG3 is the Armoury Crate
@@ -131,6 +147,10 @@ contrib/
   | undervolt get | `{"cmd":"undervolt-get"}` | `ok`, `value` (JSON: `cpu_co`, `active`, `profile`) |
   | undervolt reset | `{"cmd":"undervolt-reset"}` | `ok` |
   | full state | `{"cmd":"get-state"}` | `ok`, `state` (cached + sysfs + live temp/RPM + undervolt_available) |
+  | preset save/apply/delete | `{"cmd":"preset-save","name":"Gaming"}` (or `preset-apply`, `preset-delete`) | `ok` |
+  | power policy | `{"cmd":"power-policy-set","enabled":true,"ac_preset":"AC","battery_preset":"Battery"}` | `ok` |
+  | display posture | `{"cmd":"display-posture","posture":"tablet"}` | `ok` |
+  | display rotation | `{"cmd":"display-rotation","rotation":"left"}` | `ok` |
   | subscribe | `{"cmd":"subscribe","events":["gui-toggle"]}` | `ok`, then streams events |
 - **IPC library**: Hand-rolled JSON. gRPC/drpc require protobuf code generation;
   `net/rpc` lacks streaming; Twirp is HTTP-only. Decky plugin Python backend connects
@@ -162,16 +182,12 @@ contrib/
   which has empty calibration data). Five attributes: `ppt_pl1_spl` (Sustained),
   `ppt_pl2_sppt` (Short Boost), `ppt_fppt` (Fast Boost), `ppt_apu_sppt`,
   `ppt_platform_sppt`. Safety limits: 5–75W (safe), up to 93W with `--force`
-  (G-Helper absolute max for 2025 Z13 GZ302E). When any PPT value exceeds 75W,
-  all fans are forced to full speed before PPT writes. If fan write fails, TDP
-  write is aborted entirely. APU sPPT and Platform sPPT always follow PL2.
-- **Custom profile**: `profile --set custom` is a virtual profile that re-applies
-  saved fan curves and TDP from daemon state. It does NOT write to `platform_profile`
-  — the underlying hardware profile stays as-is. Setting any custom curve or TDP
-  implicitly sets profile to "custom". Switching to a stock profile (quiet/balanced/
-  performance) resets fan hardware to auto and TDP to firmware defaults, but preserves
-  custom settings in state for later recall. `profile --set custom` returns an error
-  if no custom fan curves or TDP have been saved.
+  (G-Helper absolute max for 2025 Z13 GZ302E). Sustained PL1 above 75W applies a
+  temporary 80%+ fan safety curve before PPT writes; the desired curve or auto
+  mode returns when PL1 becomes safe. APU sPPT and Platform sPPT follow PL2.
+- **Independent tuning overrides**: The physical profile is always quiet,
+  balanced, or performance. Fan curve, TDP, and undervolt overrides are activated
+  and reset independently. Profile changes preserve and reapply active overrides.
 - **Undervolt (Curve Optimizer)**: CPU voltage reduction via AMD Curve Optimizer,
   using direct SMU communication through the `ryzen_smu` kernel module's sysfs
   interface at `/sys/kernel/ryzen_smu_drv/`. Uses only the MP1 0x4C command for
@@ -181,16 +197,59 @@ contrib/
   whether the installed `ryzen_smu` fork actually supports CO commands on this
   platform (the amkillam fork is required for Strix Halo; the leogx9r fork does
   not work). CO values are volatile (reset on reboot/sleep); the daemon
-  reapplies them on startup and resume when the custom profile is active.
+  reapplies them on startup and resume while the override is active.
   Safety limit: CPU 0 to -40. `--get` returns saved values from daemon state
   plus the current profile (no sysfs readback exists for CO). `UndervoltState`
   includes an `Active bool` field indicating whether the offset is currently
-  applied. Switching to a stock profile resets CO in hardware but preserves
-  saved values in state for recall; the CLI displays "(not active)" when a
-  stock profile is active. The `get-state` response includes
+  applied. The `get-state` response includes
   `undervolt_available` (using `SMUProbeUndervolt()`, not just `SMUAvailable()`)
   so GUIs can hide controls when ryzen_smu is not installed or the wrong fork
   is present.
+- **NPU telemetry (amdxdna DRM ioctl)**: `internal/cli/npu.go` reads power (W)
+  and per-column utilization (%) via `DRM_AMDXDNA_QUERY_SENSORS`, plus the
+  current MP-NPU clock (npuclk) via `DRM_AMDXDNA_QUERY_CLOCK_METADATA`. These
+  are hardware-backed sensors (not derived submission-counter deltas), exposed
+  by the `amdxdna` driver (mainline since Linux 6.19; `amdxdna-dkms` 7.0+ on
+  older kernels). Unlike the amdgpu/iGPU readers which use sysfs, the NPU
+  readers issue ioctls on `/dev/accel/accelN` (discovered via
+  `/sys/class/accel/accel*/device/vendor == 0x1022`). Multiple column sensors
+  are averaged to one busy %. No `xrt-smi` or `xdna-top` dependency — pure
+  Go, one new file. Added to `api.TelemetryState` and surfaced on the
+  `status` command and in the daemon's `get-state` response. Column
+  utilization and power sensors are gated by driver version; older `amdxdna`
+  stacks may return power only.
+  **Note on `NPUClockMHz`**: the value is *live* (driver source: `mp_npu_clock.
+  freq_mhz = ndev->npuclk_freq`, updated on every DPM switch via
+  `aie2_smu.c:114`). In practice on Strix Halo it appears static at 1267 MHz
+  because the driver pins DPM at max whenever any process holds the device
+  open — but it is not metadata. Older `amdxdna` versions (pre-7.0) may not
+  update `npuclk_freq` and would report a fixed value.
+- **NPU power modes — NOT EXPOSED**: the amdxdna driver's DPM power_mode
+  interface (DEFAULT/HIGH/TURBO via `DRM_AMDXDNA_SET_STATE` with
+  `DRM_AMDXDNA_SET_POWER_MODE`) was implemented and then removed after
+  empirical A/B testing proved it has no measurable effect. Findings:
+  - The driver marks SET_STATE as `DRM_ROOT_ONLY` (`amdxdna_pci_drv.c`),
+    so setting modes required `CAP_SYS_ADMIN`.
+  - Only 3 of 5 uAPI modes work: `aie2_pm_set_mode` (`aie2_pm.c:82-126`)
+    implements DEFAULT (which equals max DPM on NPU5 because
+    `dft_dpm_level == max_dpm_level`), HIGH (max DPM, clk_gating on), and
+    TURBO (max DPM, clk_gating off). LOW and MEDIUM return `-EOPNOTSUPP`.
+  - **Sustained generation A/B (Qwen3-0.6B, 12 samples per mode)**:
+    default=2.14W, high=2.16W, turbo=2.16W — within 20mW of each other.
+  - **Bursty A/B (40-token generations every 6s, 5s idle gaps)**: all three
+    modes show identical decay curves, troughing at 0.42-0.43W between
+    bursts — 10mW spread, indistinguishable from sensor noise.
+  - **Root cause**: the driver pins DPM at max whenever any process holds
+    `/dev/accel/accelN` open. The 0.42W idle floor (vs 0.00W when the
+    device is fully released) is device-open leakage at the pinned max DPM
+    level; `power_mode` cannot reduce it. The only knob that moves NPU
+    power is whether the device file is open, which is application
+    behavior, not a mode setting.
+  - **Conclusion**: DEFAULT/HIGH/TURBO are functionally equivalent in
+    measured power across sustained AND bursty workloads. Exposing the
+    interface would mislead users into thinking they can save power;
+    honest UX is to omit it. The amdxdna driver may improve in future
+    versions; if so, re-adding the CLI surface is ~1 hour of work.
 - **Sleep/resume hook**: `internal/daemon/resume.go` watches for DBus
   `org.freedesktop.login1.Manager.PrepareForSleep` signals. On sleep
   (`PrepareForSleep(true)`), turns off the lightbar via `aura.TurnOff()` (the
@@ -270,10 +329,13 @@ Default value in source is `"1.0.0-beta"` (used only in local builds without ldf
 Config: `.goreleaser.yml`. GitHub Actions workflow: `.github/workflows/release.yml`.
 - Builds for `linux/amd64` only (hidraw is Linux-specific; Z13 is x86_64).
 - `before.hooks`: `go mod tidy` only.
-- Archives include `LICENSE` and `contrib/systemd/**/*` (user + system unit files).
+- Release archives and packages are named `z13ctl-plus`; the binary inside is `z13ctl`.
+- Archives include `README.md`, `LICENSE`, `contrib/systemd/**/*`, and
+  `contrib/udev/*`.
 - `prerelease: auto` — tags with a pre-release suffix (e.g. `v1.0.0-beta`) are marked
   as pre-release on GitHub automatically.
-- To release: `git tag v1.0.0 && git push origin v1.0.0`
+- AUR publishing is manual (`workflow_dispatch`) and requires `AUR_KEY`.
+- To release: `git tag -a vX.Y.Z -F release-notes.md && git push origin vX.Y.Z`.
 
 ## Documentation
 
@@ -318,7 +380,8 @@ by the separate z13gui binary. Phase 2a changes:
 - `api/` submodule created with `State`, `LightingState` types and all `Send*`, `Subscribe` client functions
 - `internal/daemon/` refactored to use `api.State`/`api.LightingState`
 - `cmd/*.go` updated to call `api.Send*` directly
-- Multi-module dev setup: `go.work` (gitignored) + `replace` directive in `go.mod` for pre-publication
+- Multi-module dev setup: `go.work` (gitignored) + a retained local `replace`
+  directive so the plus binary uses its local API source.
 
 **z13gui** will be a separate repo (`github.com/dahui/z13gui`) using:
 - `github.com/diamondburned/gotk4` + `github.com/diamondburned/gotk4-layer-shell`
@@ -328,7 +391,7 @@ by the separate z13gui binary. Phase 2a changes:
   brightness/speed sliders, profile list, battery slider
 - Trigger: Armoury Crate button → daemon → `gui-toggle` subscribe event → show/hide drawer
 
-**Multi-module release workflow:**
-1. Tag `api/v1.0.0` → `git tag api/v1.0.0 && git push origin api/v1.0.0`
-2. Update `go.mod`: bump `require github.com/dahui/z13ctl/api v1.0.0`, remove `replace` directive
-3. Tag main module: `git tag v1.0.0 && git push origin v1.0.0`
+**Fork API release boundary:** Tags in `aic0d3r/z13ctl-plus` do not publish the
+canonical `github.com/dahui/z13ctl/api` module. External API changes must be
+merged and tagged upstream. Plus distribution releases use only annotated
+`vX.Y.Z` tags and retain the local `replace` directive.

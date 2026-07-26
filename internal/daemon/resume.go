@@ -1,10 +1,14 @@
 package daemon
 
-// resume.go — sleep/resume watcher via systemd-logind DBus signals.
+// resume.go — sleep/resume + lid watcher via DBus signals.
 //
-// Listens for org.freedesktop.login1.Manager.PrepareForSleep(false) on the
-// system bus. When the system resumes from sleep, lighting and all volatile
-// settings (undervolt, TDP, fan curves) are reapplied from daemon state.
+// Listens for org.freedesktop.login1.Manager.PrepareForSleep on the system
+// bus: lighting is turned off before sleep and all volatile settings (lighting,
+// undervolt, TDP, fan curves) are reapplied on resume.
+//
+// Also listens for org.freedesktop.UPower.LidIsClosed changes: when the lid
+// reopens after a lock (no suspend), lighting is reapplied because the Aura
+// device loses its config while the lid is closed.
 
 import (
 	"context"
@@ -13,7 +17,6 @@ import (
 	"github.com/godbus/dbus/v5"
 
 	"github.com/dahui/z13ctl/internal/aura"
-	"github.com/dahui/z13ctl/internal/cli"
 )
 
 // watchResume connects to the system DBus and listens for resume events.
@@ -34,9 +37,20 @@ func (d *Daemon) watchResume(ctx context.Context) {
 		return
 	}
 
-	ch := make(chan *dbus.Signal, 4)
+	// UPower emits PropertiesChanged for LidIsClosed when the lid opens/closes.
+	// login1 has no lid signal; this covers the lock-only case (no suspend),
+	// where the Aura device loses its config while the lid is closed.
+	if err := conn.AddMatchSignal(
+		dbus.WithMatchObjectPath("/org/freedesktop/UPower"),
+		dbus.WithMatchInterface("org.freedesktop.DBus.Properties"),
+		dbus.WithMatchMember("PropertiesChanged"),
+	); err != nil {
+		slog.Warn("failed to add DBus match rule for UPower lid", "err", err)
+	}
+
+	ch := make(chan *dbus.Signal, 8)
 	conn.Signal(ch)
-	slog.Info("resume watcher started (listening for PrepareForSleep)")
+	slog.Info("resume watcher started (PrepareForSleep + UPower lid)")
 
 	for {
 		select {
@@ -47,29 +61,58 @@ func (d *Daemon) watchResume(ctx context.Context) {
 			if sig == nil {
 				continue
 			}
-			if sig.Name != "org.freedesktop.login1.Manager.PrepareForSleep" {
-				continue
-			}
-			if len(sig.Body) < 1 {
-				continue
-			}
-			sleeping, ok := sig.Body[0].(bool)
-			if !ok {
-				continue
-			}
-			if sleeping {
-				slog.Info("system entering sleep")
-				if d.dev != nil {
-					if err := aura.TurnOff(d.dev); err != nil {
-						slog.Warn("failed to turn off lighting before sleep", "err", err)
-					}
+			switch sig.Name {
+			case "org.freedesktop.login1.Manager.PrepareForSleep":
+				d.handlePrepareForSleep(sig)
+			case "org.freedesktop.DBus.Properties.PropertiesChanged":
+				if sig.Path == "/org/freedesktop/UPower" && lidOpened(sig) {
+					slog.Info("lid opened, restoring lighting")
+					d.restoreLighting()
 				}
-				continue
 			}
-			slog.Info("system resumed from sleep, restoring volatile state")
-			d.restoreVolatileState()
 		}
 	}
+}
+
+// handlePrepareForSleep turns lighting off before sleep and restores all
+// volatile state (lighting, TDP, fans, undervolt) on resume.
+func (d *Daemon) handlePrepareForSleep(sig *dbus.Signal) {
+	if len(sig.Body) < 1 {
+		return
+	}
+	sleeping, ok := sig.Body[0].(bool)
+	if !ok {
+		return
+	}
+	if sleeping {
+		slog.Info("system entering sleep")
+		if d.dev != nil {
+			if err := aura.TurnOff(d.dev); err != nil {
+				slog.Warn("failed to turn off lighting before sleep", "err", err)
+			}
+		}
+		return
+	}
+	slog.Info("system resumed from sleep, restoring volatile state")
+	d.restoreVolatileState()
+}
+
+// lidOpened reports whether a UPower PropertiesChanged signal indicates the
+// lid transitioned to open (LidIsClosed became false).
+func lidOpened(sig *dbus.Signal) bool {
+	if len(sig.Body) < 2 {
+		return false
+	}
+	changed, ok := sig.Body[1].(map[string]dbus.Variant)
+	if !ok {
+		return false
+	}
+	v, ok := changed["LidIsClosed"]
+	if !ok {
+		return false
+	}
+	closed, ok := v.Value().(bool)
+	return ok && !closed
 }
 
 // restoreVolatileState reapplies all settings that are lost on sleep/resume:
@@ -78,6 +121,14 @@ func (d *Daemon) restoreVolatileState() {
 	d.mu.Lock()
 	state := d.state
 	d.mu.Unlock()
+	defer d.requestDisplayReconcile()
+
+	if state.ActivePreset == "" {
+		d.applyMu.Lock()
+		defer d.applyMu.Unlock()
+	} else {
+		d.applyMu.Lock()
+	}
 
 	// Restore lighting (lost on sleep regardless of profile).
 	if d.dev != nil {
@@ -88,50 +139,36 @@ func (d *Daemon) restoreVolatileState() {
 		}
 	}
 
-	if state.Profile != "custom" {
-		slog.Info("skipping volatile state restore (stock profile active)", "profile", state.Profile)
+	if state.ActivePreset != "" {
+		d.applyMu.Unlock()
+		if err := d.applyPreset(state.ActivePreset); err != nil {
+			slog.Warn("resume: failed to restore active preset", "preset", state.ActivePreset, "err", err)
+		} else {
+			slog.Info("resume: active preset restored", "preset", state.ActivePreset)
+		}
 		return
 	}
 
-	// Restore fan curve.
-	if fc := state.FanCurve; fc != nil && fc.Mode == 1 && len(fc.Points) == 8 {
-		if err := cli.SetBothFanCurves(fc.Points); err != nil {
-			slog.Warn("resume: failed to restore fan curve", "err", err)
-		} else {
-			slog.Info("resume: fan curve restored")
-		}
+	if err := applyTuning(state, false); err != nil {
+		slog.Warn("resume: failed to restore tuning", "err", err)
+	} else {
+		slog.Info("resume: tuning restored", "profile", state.Profile)
 	}
+}
 
-	// Restore TDP.
-	if t := state.TDP; t != nil {
-		if t.PL1SPL > cli.TDPMaxSafe {
-			if err := cli.SetBothFanCurves(cli.HighTDPFanCurve()); err != nil {
-				slog.Warn("resume: failed to set high-TDP fan curve", "err", err)
-			}
-		}
-		if err := cli.SetTDP(0, t.PL1SPL, t.PL2SPPT, t.FPPT); err != nil {
-			slog.Warn("resume: failed to restore TDP", "err", err)
-		} else {
-			slog.Info("resume: TDP restored", "pl1", t.PL1SPL, "pl2", t.PL2SPPT, "pl3", t.FPPT)
-		}
+// restoreLighting reapplies the current lighting config. Used on lid-open when
+// the system locks but does not sleep: the Aura device loses its config while
+// the lid is closed, so it must be re-pushed when the lid reopens.
+func (d *Daemon) restoreLighting() {
+	d.applyMu.Lock()
+	defer d.applyMu.Unlock()
+	defer d.requestDisplayReconcile()
+	if d.dev == nil {
+		return
 	}
-
-	// Restore undervolt.
-	if uv := state.Undervolt; uv != nil && cli.SMUProbeUndervolt() {
-		d.mu.Lock()
-		if d.state.Undervolt != nil {
-			d.state.Undervolt.Active = false
-		}
-		d.mu.Unlock()
-		if err := cli.SetCurveOptimizer(uv.CPUCO); err != nil {
-			slog.Warn("resume: failed to restore undervolt", "err", err)
-		} else {
-			d.mu.Lock()
-			if d.state.Undervolt != nil {
-				d.state.Undervolt.Active = true
-			}
-			d.mu.Unlock()
-			slog.Info("resume: undervolt restored", "cpu", uv.CPUCO)
-		}
+	if err := d.applyLightingState(); err != nil {
+		slog.Warn("lid: failed to restore lighting", "err", err)
+		return
 	}
+	slog.Info("lid: lighting restored")
 }

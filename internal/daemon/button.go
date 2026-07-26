@@ -86,15 +86,8 @@ func runButtonLoop(ctx context.Context, path string, ch chan<- struct{}) error {
 	slog.Info("watching Armoury Crate button", "path", path)
 
 	// Closing the device unblocks ReadOne when ctx is done.
-	stop := make(chan struct{})
-	go func() {
-		select {
-		case <-ctx.Done():
-			_ = dev.Close()
-		case <-stop:
-		}
-	}()
-	defer close(stop)
+	stop := context.AfterFunc(ctx, func() { _ = dev.Close() })
+	defer stop()
 
 	for {
 		evt, err := dev.ReadOne()

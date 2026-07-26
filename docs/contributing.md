@@ -16,16 +16,17 @@ This repo contains two Go modules:
 
 The `api/` module is stdlib-only so that GUI tools, Decky plugins, and other
 integrations can import it without pulling in the CLI's dependencies.
+These canonical module paths intentionally remain under `dahui/z13ctl` so
+existing consumers stay compatible with the upstream API.
 
 ---
 
 ## Development setup
 
 ```sh
-git clone https://github.com/dahui/z13ctl
-cd z13ctl
+git clone https://github.com/aic0d3r/z13ctl-plus
+cd z13ctl-plus
 go mod download
-cd api && go mod download && cd ..
 ```
 
 To work on both modules together in your IDE or when making changes to `api/`,
@@ -68,13 +69,19 @@ should include tests for any new behavior.
 
 ## Release workflow (maintainers only)
 
-The `api/` module must be tagged before the main module so the main module
-can reference a real published version:
+This distribution retains the canonical `github.com/dahui/z13ctl/api` module
+path. Tagging this fork does not publish that module path; API changes must be
+merged and tagged upstream before external consumers can fetch them.
+
+Create an annotated distribution tag to publish z13ctl-plus:
 
 ```sh
-git tag api/v0.x.y && git push origin api/v0.x.y  # tag api/ first
-git tag v0.x.y     && git push origin v0.x.y       # then tag main module
+git tag -a vX.Y.Z -F release-notes.md
+git push origin vX.Y.Z
 ```
 
 GoReleaser handles binary builds and GitHub Release creation automatically
 when the main module tag is pushed.
+
+AUR publishing is a separate manual workflow dispatch and requires the
+repository `AUR_KEY` secret.

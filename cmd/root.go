@@ -1,4 +1,4 @@
-// Package cmd implements the z13ctl CLI subcommands via Cobra.
+// Package cmd implements the z13ctl command shipped by z13ctl-plus.
 // Each file in this package defines exactly one subcommand.
 // CLI support utilities (color parsing, dry-run display) live in internal/cli.
 //
@@ -11,7 +11,7 @@ import (
 
 // Version is the current release. Override at build time:
 //
-//	go build -ldflags "-X z13ctl/cmd.Version=1.2.3" .
+//	go build -ldflags "-X github.com/dahui/z13ctl/cmd.Version=1.2.3" .
 var Version = "1.0.0-beta"
 
 var (
@@ -24,7 +24,7 @@ var rootCmd = &cobra.Command{
 	Use:     "z13ctl",
 	Version: Version,
 	Short:   "System control for the ASUS ROG Flow Z13",
-	Long: `z13ctl — system control for the 2025 ASUS ROG Flow Z13
+	Long: `z13ctl-plus — system control for the 2025 ASUS ROG Flow Z13
 
 Controls keyboard and lightbar RGB via Linux hidraw, performance profile and
 battery charge limit via asus-wmi sysfs, and boot sound and panel overdrive

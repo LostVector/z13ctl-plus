@@ -1,4 +1,4 @@
-# z13ctl
+# z13ctl-plus
 
 RGB lighting, performance profiles, battery limit, fan curves, TDP control,
 CPU undervolting, and display settings for the 2025 ASUS ROG Flow Z13 on
@@ -6,7 +6,12 @@ Linux.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
-`z13ctl` implements the Aura HID protocol directly against the Linux `hidraw`
+`z13ctl-plus` is a compatibility-preserving distribution of
+[`dahui/z13ctl`](https://github.com/dahui/z13ctl). It deliberately retains the
+`z13ctl` command, systemd units, socket and state paths, and canonical
+`github.com/dahui/z13ctl/api` Go API so existing integrations keep working.
+
+`z13ctl-plus` implements the Aura HID protocol directly against the Linux `hidraw`
 interface — no kernel patches, no external daemons. System settings (profiles,
 battery limit, boot sound, panel overdrive, fan curves, TDP) use the standard
 asus-wmi and asus-armoury sysfs interfaces. CPU undervolting uses the
@@ -18,30 +23,31 @@ watches the Armoury Crate button.
 > [!TIP]
 > **New to Linux? Install [z13gui](https://github.com/dahui/z13gui).** Most
 > users (especially newcomers!) should use **z13gui**, a touch-friendly
-> graphical overlay that exposes every z13ctl feature (lighting, fan curves,
+> graphical overlay that exposes every z13ctl-plus feature (lighting, fan curves,
 > TDP, undervolt, profiles, battery limit) with no command line required. The
 > raw `z13ctl` CLI shines for scripting and advanced tuning, but if you're not a
-> Linux veteran, install z13gui alongside z13ctl for a far smoother experience.
+> Linux veteran, install z13gui alongside z13ctl-plus for a far smoother experience.
+> The Armoury Crate button opens the overlay.
 
 ## Install
 
 ```sh
 # Arch Linux (AUR)
-yay -S z13ctl-bin
+yay -S z13ctl-plus-bin
 
 # Debian / Ubuntu
-sudo apt install ./z13ctl_*.deb
+sudo apt install ./z13ctl-plus_*.deb
 
 # Fedora / RHEL
-sudo dnf install ./z13ctl_*.rpm
+sudo dnf install ./z13ctl-plus_*.rpm
 
 # Manual (from release tarball)
-tar xzf z13ctl_*_linux_amd64.tar.gz
+tar xzf z13ctl-plus_*_linux_amd64.tar.gz
 sudo install -Dm755 z13ctl /usr/local/bin/z13ctl
 sudo z13ctl setup
 ```
 
-See the [Installation guide](https://dahui.github.io/z13ctl/installation/) for
+See the [Installation guide](https://aic0d3r.github.io/z13ctl-plus/installation/) for
 systemd service setup, source builds, and uninstall instructions.
 
 ## Quick Start
@@ -77,12 +83,15 @@ z13ctl undervolt --set -20
 
 ## Documentation
 
-Full documentation at **<https://dahui.github.io/z13ctl>**
+Full documentation at **<https://aic0d3r.github.io/z13ctl-plus>**
 
-- [Installation](https://dahui.github.io/z13ctl/installation/)
-- [Quick Start](https://dahui.github.io/z13ctl/getting-started/)
-- [Commands](https://dahui.github.io/z13ctl/commands/)
-- [Daemon](https://dahui.github.io/z13ctl/daemon/)
-- [API](https://dahui.github.io/z13ctl/api/)
-- [Contributing](https://dahui.github.io/z13ctl/contributing/)
+- [Installation](https://aic0d3r.github.io/z13ctl-plus/installation/)
+- [Quick Start](https://aic0d3r.github.io/z13ctl-plus/getting-started/)
+- [Commands](https://aic0d3r.github.io/z13ctl-plus/commands/)
+- [Daemon](https://aic0d3r.github.io/z13ctl-plus/daemon/)
+- [API](https://aic0d3r.github.io/z13ctl-plus/api/)
+- [Contributing](https://aic0d3r.github.io/z13ctl-plus/contributing/)
 
+## License
+
+[Apache 2.0](LICENSE)

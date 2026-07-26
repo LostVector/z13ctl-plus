@@ -7,7 +7,7 @@ import "fmt"
 // Mode corresponds to g-helper's AuraMode enum.
 type Mode byte
 
-// Mode byte values correspond to g-helper's AuraMode enum.
+// Mode byte values verified on the 2025 Z13.
 const (
 	ModeStatic  Mode = 0
 	ModeBreathe Mode = 1

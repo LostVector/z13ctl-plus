@@ -19,6 +19,12 @@ func TestModeFromString(t *testing.T) {
 		{"cycle", aura.ModeCycle, false},
 		{"rainbow", aura.ModeRainbow, false},
 		{"strobe", aura.ModeStrobe, false},
+		// Modes for other Aura hardware are intentionally rejected.
+		{"rainbow2", 0, true},
+		{"star", 0, true},
+		{"rain", 0, true},
+		{"laser", 0, true},
+		{"reactive", 0, true},
 		// ModeFromString is case-sensitive (matches CLI flag exactly)
 		{"STATIC", 0, true},
 		{"Static", 0, true},
