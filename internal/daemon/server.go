@@ -641,10 +641,19 @@ func (d *Daemon) handleFanCurve(req request) response {
 
 func (d *Daemon) handleFanCurveReset() response {
 	d.mu.Lock()
-	safety := planTuning(d.state).FanSafety
+	next := d.state
+	next.FanCurve = nil
+	next.FanCurveActive = false
+	plan := planTuning(next)
 	d.mu.Unlock()
-	if !safety {
-		if err := cli.ResetAllFanCurves(); err != nil {
+	if !plan.FanSafety {
+		var err error
+		if plan.Fan != nil {
+			err = cli.SetBothFanCurves(plan.Fan.Points)
+		} else {
+			err = cli.ResetAllFanCurves()
+		}
+		if err != nil {
 			return response{OK: false, Error: "fancurve-reset: " + err.Error()}
 		}
 	}
