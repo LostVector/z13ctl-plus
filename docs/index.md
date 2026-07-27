@@ -47,7 +47,7 @@ automatically when the detachable keyboard is removed and reattached.
 
 !!! tip "New to Linux? Use the GUI"
     Most users — especially those newer to Linux — should install
-    **[z13gui](https://github.com/dahui/z13gui)**, a touch-friendly GTK4 overlay
+    **[z13gui](https://github.com/aic0d3r/z13gui-plus)**, a touch-friendly GTK4 overlay
     that controls every z13ctl-plus feature (lighting, fan curves, TDP, undervolt,
     profiles, battery limit) through the daemon — no command line required. The
     raw `z13ctl` CLI is great for scripting and advanced tuning, but if you're

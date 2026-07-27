@@ -31,7 +31,7 @@ Compared with the upstream project, z13ctl-plus adds:
 - Live CPU, GPU, VRAM, NPU, fan, thermal, and detailed battery telemetry
 
 > [!TIP]
-> **New to Linux? Install [z13gui](https://github.com/dahui/z13gui).** Most
+> **New to Linux? Install [z13gui](https://github.com/aic0d3r/z13gui-plus).** Most
 > users (especially newcomers!) should use **z13gui**, a touch-friendly
 > graphical overlay that exposes every z13ctl-plus feature (lighting, fan curves,
 > TDP, undervolt, profiles, battery limit) with no command line required. The

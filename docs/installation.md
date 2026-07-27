@@ -222,13 +222,13 @@ If it prints nothing, see [Troubleshooting](#troubleshooting) below.
 ## GUI Frontend
 
 **Highly recommended for most users.** Install
-[z13gui](https://github.com/dahui/z13gui) alongside z13ctl-plus — a touch-friendly
+[z13gui](https://github.com/aic0d3r/z13gui-plus) alongside z13ctl-plus — a touch-friendly
 GTK4 overlay that communicates with z13ctl through its daemon and exposes every
 feature graphically. While the raw `z13ctl` CLI is ideal for scripting and
 advanced tuning, beginners and anyone who prefers a point-and-tap interface will
 find the more advanced features (custom fan curves, TDP, undervolting) far
 easier to use through z13gui. See the
-[z13gui README](https://github.com/dahui/z13gui#readme) for installation
+[z13gui README](https://github.com/aic0d3r/z13gui-plus#readme) for installation
 instructions.
 
 !!! note "Requires the daemon"
