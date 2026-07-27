@@ -23,10 +23,12 @@ package cli
 // application behavior, not a mode we can toggle.
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"unsafe"
 )
@@ -85,8 +87,9 @@ type amdxdnaQueryClockMetadata struct {
 
 // npuDeviceOnce + npuDevicePath cache the discovered accel device path.
 var (
-	npuDeviceOnce sync.Once
-	npuDevicePath string
+	npuDeviceOnce         sync.Once
+	npuDevicePath         string
+	npuSensorsUnsupported atomic.Bool
 )
 
 // findNPUDevice returns the /dev/accel/accelN path for the AMD XDNA NPU,
@@ -159,14 +162,34 @@ func npuQuery(param uint32) ([]byte, error) {
 	return nil, fmt.Errorf("amdxdna ioctl %d: buffer retry exhausted", param)
 }
 
-// ReadNPUSensors returns the NPU power draw (W, decimal) and the average
-// per-column utilization (0–100). Returns (0, 0, err) when the NPU or sensors
-// are unavailable. Multiple column-utilization sensors (Strix Halo exposes one
-// per AIE column) are averaged to a single busy percentage.
-//
-// Power is reported with sub-watt precision (the driver exposes mW).
+func npuRuntimeActive() (bool, error) {
+	device := findNPUDevice()
+	if device == "" {
+		return false, fmt.Errorf("amdxdna NPU not found")
+	}
+	name := strings.TrimPrefix(device, "/dev/accel/")
+	status, err := os.ReadFile("/sys/class/accel/" + name + "/device/power/runtime_status")
+	if err != nil {
+		return false, err
+	}
+	return strings.TrimSpace(string(status)) == "active", nil
+}
+
+// ReadNPUSensors returns NPU power draw and average per-column utilization.
+// An idle NPU is unavailable. On drivers without the sensor query, an active
+// NPU is reported with zero-valued power and utilization.
 func ReadNPUSensors() (powerW float64, utilPct int, err error) {
+	if active, runtimeErr := npuRuntimeActive(); runtimeErr == nil && !active {
+		return 0, 0, fmt.Errorf("amdxdna NPU is idle")
+	}
+	if npuSensorsUnsupported.Load() {
+		return 0, 0, nil
+	}
 	payload, err := npuQuery(drmAmdxdnaQuerySensors)
+	if errors.Is(err, syscall.EOPNOTSUPP) {
+		npuSensorsUnsupported.Store(true)
+		return 0, 0, nil
+	}
 	if err != nil {
 		return 0, 0, err
 	}

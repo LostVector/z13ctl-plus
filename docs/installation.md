@@ -41,6 +41,50 @@ make
 sudo make install
 ```
 
+### NPU telemetry on CachyOS
+
+CachyOS kernels that provide amdxdna natively should use that in-tree module.
+It supports NPU power and column-utilization sensors, while older
+`amdxdna-dkms` builds may allow inference but return `EOPNOTSUPP` for the
+sensor query. In that case z13ctl reports `ACTIVE` without inventing watt or
+utilization values.
+
+Check which module is selected and validate the runtime:
+
+```sh
+modinfo -n amdxdna
+flm validate
+```
+
+The optimal setup reports a module below
+`kernel/drivers/accel/amdxdna/`. A path below `updates/dkms/` means DKMS is
+overriding the kernel module. Before changing it, confirm the kernel package
+actually includes a native module:
+
+```sh
+pacman -Qo "/usr/lib/modules/$(uname -r)/kernel/drivers/accel/amdxdna/amdxdna.ko.zst"
+```
+
+If that file is owned by the installed kernel, test it reversibly:
+
+```sh
+sudo dkms remove amdxdna/7.0 -k "$(uname -r)"
+sudo depmod -a "$(uname -r)"
+reboot
+```
+
+After reboot, run `modinfo -n amdxdna` and `flm validate` again. Restore the
+DKMS override if the native driver causes a regression:
+
+```sh
+sudo dkms install amdxdna/7.0 -k "$(uname -r)"
+reboot
+```
+
+Do not remove DKMS on an older kernel that lacks a native amdxdna module.
+z13ctl supports both configurations: sensor-capable drivers report watts and
+utilization, while sensorless drivers report activity only.
+
 ---
 
 ## Install
