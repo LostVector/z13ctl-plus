@@ -1,4 +1,4 @@
-# z13ctl-plus
+# z13ctl+
 
 Power automation, composable tuning overrides, AMD P-State policy, coordinated
 display state, and expanded telemetry for the 2025 ASUS ROG Flow Z13 on Linux.
