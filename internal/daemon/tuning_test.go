@@ -52,18 +52,15 @@ func TestPlanTuningIndependentOverrides(t *testing.T) {
 	}
 }
 
-func TestPlanTuningQuietUsesDefaultCurve(t *testing.T) {
+func TestPlanTuningQuietUsesFirmwareAuto(t *testing.T) {
 	plan := planTuning(api.State{Profile: "quiet"})
-	if plan.Fan == nil || len(plan.Fan.Points) != 8 {
-		t.Fatalf("quiet fan plan = %+v", plan.Fan)
-	}
-	if plan.Fan.Points[1].Temp != 55 || plan.Fan.Points[1].PWM != 0 {
-		t.Errorf("quiet fan-off threshold = %+v, want 55C at PWM 0", plan.Fan.Points[1])
+	if plan.Fan != nil {
+		t.Fatalf("quiet profile should use firmware auto fan control: %+v", plan.Fan)
 	}
 
 	custom := &api.FanCurveState{Mode: 1, Points: []api.FanCurvePoint{{Temp: 40, PWM: 10}}}
 	plan = planTuning(api.State{Profile: "quiet", FanCurve: custom, FanCurveActive: true})
-	if plan.Fan.Points[0] != custom.Points[0] {
+	if plan.Fan == nil || plan.Fan.Points[0] != custom.Points[0] {
 		t.Errorf("custom curve did not override quiet default: %+v", plan.Fan)
 	}
 }

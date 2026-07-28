@@ -58,14 +58,8 @@ Profiles:
 			if err := cli.SetProfile(profile); err != nil {
 				return fmt.Errorf("setting platform profile: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
 			}
-			var fanErr error
-			if profile == "quiet" {
-				fanErr = cli.SetBothFanCurves(cli.QuietFanCurve())
-			} else {
-				fanErr = cli.ResetAllFanCurves()
-			}
-			if fanErr != nil {
-				return fmt.Errorf("setting profile fan curve: %w", fanErr)
+			if err := cli.ResetAllFanCurves(); err != nil {
+				return fmt.Errorf("resetting profile fan curve: %w", err)
 			}
 			fmt.Printf("Performance profile set to %s\n", profile)
 			return nil

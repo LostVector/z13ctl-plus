@@ -189,21 +189,6 @@ func HighTDPFanCurve() []api.FanCurvePoint {
 	}
 }
 
-// QuietFanCurve delays fan startup for light workloads while ramping firmly at
-// higher temperatures.
-func QuietFanCurve() []api.FanCurvePoint {
-	return []api.FanCurvePoint{
-		{Temp: 50, PWM: 0},
-		{Temp: 55, PWM: 0},
-		{Temp: 60, PWM: 20},
-		{Temp: 65, PWM: 35},
-		{Temp: 70, PWM: 55},
-		{Temp: 75, PWM: 80},
-		{Temp: 80, PWM: 120},
-		{Temp: 90, PWM: 180},
-	}
-}
-
 // ParseFanCurve parses a fan curve string "temp:pwm,temp:pwm,..." into a
 // slice of FanCurvePoint. Requires exactly 8 points. Temps must be
 // monotonically increasing (0–120°C). PWM values must be monotonically

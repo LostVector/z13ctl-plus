@@ -38,8 +38,6 @@ func planTuning(state api.State) tuningPlan {
 		plan.Fan = &api.FanCurveState{Mode: 1, Points: cli.HighTDPFanCurve()}
 	} else if state.FanCurveActive && state.FanCurve != nil {
 		plan.Fan = cloneFanCurve(state.FanCurve)
-	} else if state.Profile == "quiet" {
-		plan.Fan = &api.FanCurveState{Mode: 1, Points: cli.QuietFanCurve()}
 	}
 	if state.UndervoltActive && state.Undervolt != nil {
 		plan.Undervolt = clonePtr(state.Undervolt)
