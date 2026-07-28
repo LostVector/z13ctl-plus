@@ -1,43 +1,36 @@
 # z13ctl-plus
 
-RGB lighting, performance profiles, battery limit, fan curves, TDP control,
-CPU undervolting, and display settings for the 2025 ASUS ROG Flow Z13 on
-Linux.
+Power automation, composable tuning overrides, AMD P-State policy, coordinated
+display state, and expanded telemetry for the 2025 ASUS ROG Flow Z13 on Linux.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 `z13ctl-plus` is a compatibility-preserving distribution of
 [`dahui/z13ctl`](https://github.com/dahui/z13ctl). It deliberately retains the
 `z13ctl` command, systemd units, socket and state paths, and canonical
-`github.com/dahui/z13ctl/api` Go API so existing integrations keep working.
+`github.com/dahui/z13ctl/api` import path, preserving compatibility for
+integrations that use those interfaces.
 
-`z13ctl-plus` implements the Aura HID protocol directly against the Linux `hidraw`
-interface — no kernel patches, no external daemons. System settings (profiles,
-battery limit, boot sound, panel overdrive, fan curves, TDP) use the standard
-asus-wmi and asus-armoury sysfs interfaces. CPU undervolting uses the
-`ryzen_smu` kernel module for AMD Curve Optimizer control. A background daemon
-persists state across reboots, restores volatile settings after sleep/resume,
-re-applies keyboard lighting when the detachable keyboard is reattached, and
-watches the Armoury Crate button.
+## What Plus Adds
 
-## What the plus fork adds
-
-Compared with the upstream project, z13ctl-plus adds:
-
-- CPU minimum-frequency, energy-performance-preference, and boost controls
-- Named performance presets with automatic AC/battery switching
-- Coordinated display posture, rotation, scale, and refresh-rate handling
-- Independent fan-curve, TDP, and undervolt overrides
-- Live CPU, GPU, VRAM, NPU, fan, thermal, and detailed battery telemetry
+- **Whole-system power automation** — capture named presets and assign separate
+  configurations to plugged-in and battery operation
+- **Composable tuning** — keep the physical profile independent from fan-curve,
+  TDP, and undervolt overrides; reset or restore each without disturbing the others
+- **AMD P-State policy** — manage minimum CPU frequency, EPP, and boost through
+  presets and the API
+- **Coordinated display state** — serialize KDE posture, rotation, scale, and
+  refresh changes for the internal panel without touching external displays
+- **Expanded telemetry** — expose CPU, GPU, NPU, memory, VRAM, dual-fan, thermal,
+  power, clock, and detailed battery data
+- **Better hardware recovery** — restore lighting after lid-open events that do
+  not suspend and preserve firmware zero-RPM behavior in the Quiet profile
 
 > [!TIP]
-> **New to Linux? Install [z13gui](https://github.com/aic0d3r/z13gui-plus).** Most
-> users (especially newcomers!) should use **z13gui**, a touch-friendly
-> graphical overlay that exposes every z13ctl-plus feature (lighting, fan curves,
-> TDP, undervolt, profiles, battery limit) with no command line required. The
-> raw `z13ctl` CLI shines for scripting and advanced tuning, but if you're not a
-> Linux veteran, install z13gui alongside z13ctl-plus for a far smoother experience.
-> The Armoury Crate button opens the overlay.
+> **Prefer a touch interface? Install
+> [Z13GUI+](https://github.com/aic0d3r/z13gui-plus).** It exposes power automation,
+> CPU policy, expanded telemetry, refresh rate, and tuning controls through the
+> daemon. Display posture/rotation and scripting remain CLI/API workflows.
 
 ## Install
 
@@ -63,32 +56,22 @@ systemd service setup, source builds, and uninstall instructions.
 ## Quick Start
 
 ```sh
-# Solid cyan at full brightness
-z13ctl apply --color cyan --brightness high
+# Create/update the recommended AC and battery presets and apply the current one
+z13ctl preset restore-recommended
 
-# Breathing red
-z13ctl apply --mode breathe --color red --speed slow
+# Inspect and enable automatic source switching
+z13ctl preset list
+z13ctl preset policy --enable --ac "Plugged In" --battery "On Battery"
 
-# Rainbow wave
-z13ctl apply --mode rainbow --speed normal
+# Apply a named configuration manually
+z13ctl preset apply "On Battery"
 
-# Turn off lighting
-z13ctl off
+# Coordinate tablet posture and rotation through the daemon
+z13ctl display posture tablet
+z13ctl display rotation right
 
-# Set performance profile
-z13ctl profile --set balanced
-
-# Cap battery charge at 80%
-z13ctl batterylimit --set 80
-
-# Custom fan curve (8-point, temp:pwm pairs — both fans)
-z13ctl fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
-
-# Set TDP to 50W
-z13ctl tdp --set 50
-
-# Undervolt CPU by -20 (Curve Optimizer, requires ryzen_smu)
-z13ctl undervolt --set -20
+# Inspect expanded live telemetry and active overrides
+z13ctl status
 ```
 
 ## Documentation

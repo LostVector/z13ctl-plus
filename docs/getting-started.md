@@ -1,17 +1,51 @@
 # Quick Start
 
 These examples assume you have [installed z13ctl-plus](installation.md) and run
-`sudo z13ctl setup`. The daemon does not need to be running — commands fall
-back to direct hardware access automatically. See [Daemon](daemon.md) for why
-you probably want the daemon running anyway.
+`sudo z13ctl setup`. Most direct hardware commands work without the daemon.
+Named presets, automatic power-source switching, display intents, and persisted
+state operations require it.
 
 !!! tip "Prefer not to use the command line? Use z13gui"
-    Everything below can be done from a graphical interface instead. If you're
-    new to Linux or simply prefer not to type commands, install
-    **[z13gui](https://github.com/aic0d3r/z13gui-plus)** — a touch-friendly overlay
-    that drives all of these features (lighting, fan curves, TDP, undervolt,
-    profiles) through the daemon. The CLI examples here remain useful for
-    scripting and advanced tuning.
+    **[Z13GUI+](https://github.com/aic0d3r/z13gui-plus)** provides touch-friendly
+    controls for power automation, CPU policy, expanded telemetry, refresh rate,
+    and tuning through the daemon. Display posture/rotation and scripting remain
+    CLI/API workflows.
+
+---
+
+## Power automation
+
+Create or update the recommended source-specific presets, assign them, and apply
+the configuration for the current power source:
+
+```sh
+z13ctl preset restore-recommended
+z13ctl preset policy --enable --ac "Plugged In" --battery "On Battery"
+z13ctl preset list
+```
+
+Apply any saved configuration manually without changing the assignments:
+
+```sh
+z13ctl preset apply "On Battery"
+```
+
+The daemon preserves a manual selection until the next real AC/battery transition.
+
+---
+
+## Display coordination
+
+Publish internal-panel posture and rotation intent to the daemon's KDE display
+coordinator:
+
+```sh
+z13ctl display posture tablet
+z13ctl display rotation right
+```
+
+The coordinator combines scale, rotation, and preset refresh-rate changes without
+modifying external displays.
 
 ---
 

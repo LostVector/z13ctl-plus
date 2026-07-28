@@ -1,6 +1,6 @@
 site_name: z13ctl-plus
 site_url: https://aic0d3r.github.io/z13ctl-plus
-site_description: z13ctl-plus RGB lighting and system control for the 2025 ASUS ROG Flow Z13 on Linux.
+site_description: Compatibility-preserving z13ctl distribution with power automation, composable tuning, coordinated display state, and expanded telemetry.
 
 repo_url: https://github.com/aic0d3r/z13ctl-plus
 repo_name: aic0d3r/z13ctl-plus

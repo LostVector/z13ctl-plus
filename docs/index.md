@@ -1,8 +1,7 @@
 # z13ctl-plus
 
-RGB lighting, performance profiles, battery limit, fan curves, TDP control,
-CPU undervolting, and display settings for the **2025 ASUS ROG Flow Z13**
-on Linux.
+Power automation, composable tuning overrides, AMD P-State policy, coordinated
+display state, and expanded telemetry for the **2025 ASUS ROG Flow Z13** on Linux.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/aic0d3r/z13ctl-plus/blob/main/LICENSE)
 
@@ -12,61 +11,26 @@ command and retains the canonical `github.com/dahui/z13ctl/api` Go API.
 
 ---
 
-## What the plus fork adds
+## What Plus Adds
 
-- CPU minimum-frequency, energy-performance-preference, and boost controls
-- Named presets with automatic AC/battery switching
-- Coordinated display posture, rotation, scale, and refresh-rate handling
-- Independent fan-curve, TDP, and undervolt overrides
-- Expanded CPU, GPU, VRAM, NPU, thermal, fan, and battery telemetry
-
----
-
-## What z13ctl-plus does
-
-- **RGB lighting** — set color, mode, speed, and brightness on the keyboard backlight
-  and edge lightbar, independently or together
-- **Performance profiles** — switch between `quiet`, `balanced`, and `performance`
-  via the asus-wmi sysfs interface
-- **Battery charge limit** — cap charging at any percentage (40–100) to extend
-  long-term battery health
-- **Fan curves** — set custom 8-point fan curves via the asus-wmi hwmon interface
-  (both fans cool the same APU and share one curve)
-- **TDP control** — set CPU/GPU power limits (5–93W) via asus-nb-wmi PPT attributes,
-  with automatic fan safety above 75W
-- **CPU undervolting** — reduce voltage via AMD Curve Optimizer for lower
-  temperatures and power draw without reducing performance (requires `ryzen_smu`
-  kernel module)
-- **Boot sound** — enable or disable the POST beep via the asus-armoury firmware
-  attributes interface
-- **Panel overdrive** — toggle display overdrive for reduced motion blur
-
-All features work without root after a one-time `setup` step, and all persist across
-reboots when the daemon is running. The daemon also re-applies keyboard lighting
-automatically when the detachable keyboard is removed and reattached.
+- **Whole-system power automation** — capture named presets and assign separate
+  configurations to plugged-in and battery operation
+- **Composable tuning** — keep the physical profile independent from fan-curve,
+  TDP, and undervolt overrides; reset or restore each without disturbing the others
+- **AMD P-State policy** — manage minimum CPU frequency, EPP, and boost through
+  presets and the API
+- **Coordinated display state** — serialize KDE posture, rotation, scale, and
+  refresh changes for the internal panel without touching external displays
+- **Expanded telemetry** — expose CPU, GPU, NPU, memory, VRAM, dual-fan, thermal,
+  power, clock, and detailed battery data
+- **Better hardware recovery** — restore lighting after lid-open events that do
+  not suspend and preserve firmware zero-RPM behavior in the Quiet profile
 
 !!! tip "New to Linux? Use the GUI"
-    Most users — especially those newer to Linux — should install
-    **[z13gui](https://github.com/aic0d3r/z13gui-plus)**, a touch-friendly GTK4 overlay
-    that controls every z13ctl-plus feature (lighting, fan curves, TDP, undervolt,
-    profiles, battery limit) through the daemon — no command line required. The
-    raw `z13ctl` CLI is great for scripting and advanced tuning, but if you're
-    not a Linux veteran you'll have a far smoother experience with the GUI.
-    Install z13gui alongside z13ctl-plus for the full experience.
-
----
-
-## Background
-
-Linux support for RGB control on the 2025 ASUS ROG Flow Z13 is limited.
-OpenRGB does not support this model. asusctl does not work with it.
-rogauracore only controls the keyboard backlight. HHD works on Bazzite kernels
-but requires out-of-tree patches that reduce performance on CachyOS.
-
-z13ctl-plus implements the Aura HID protocol directly against the Linux `hidraw`
-interface — no kernel patches, no external daemons. The protocol was
-reverse-engineered from [g-helper](https://github.com/seerge/g-helper) (MIT).
-A full protocol specification is available in the [Protocol Reference](protocol.md).
+    **[Z13GUI+](https://github.com/aic0d3r/z13gui-plus)** provides touch-friendly
+    controls for power automation, CPU policy, expanded telemetry, refresh rate,
+    and tuning through the daemon. Display posture/rotation and scripting remain
+    CLI/API workflows.
 
 ---
 
@@ -83,6 +47,5 @@ A full protocol specification is available in the [Protocol Reference](protocol.
 ## Next steps
 
 Head to the [Installation](installation.md) guide to get z13ctl-plus on your system,
-then follow the [Quick Start](getting-started.md) to configure lighting, fan
-curves, and performance profiles. For the full CLI reference, see
-[Commands](commands.md).
+then follow the [Quick Start](getting-started.md) to configure power automation
+and display behavior. For the full CLI reference, see [Commands](commands.md).

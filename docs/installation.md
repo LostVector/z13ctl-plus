@@ -187,7 +187,7 @@ utilization, while sensorless drivers report activity only.
 
 === "From source"
 
-    Requires Go 1.23 or later.
+    Requires Go 1.25 or later.
 
     ```sh
     git clone https://github.com/aic0d3r/z13ctl-plus
@@ -223,11 +223,10 @@ If it prints nothing, see [Troubleshooting](#troubleshooting) below.
 
 **Highly recommended for most users.** Install
 [z13gui](https://github.com/aic0d3r/z13gui-plus) alongside z13ctl-plus — a touch-friendly
-GTK4 overlay that communicates with z13ctl through its daemon and exposes every
-feature graphically. While the raw `z13ctl` CLI is ideal for scripting and
-advanced tuning, beginners and anyone who prefers a point-and-tap interface will
-find the more advanced features (custom fan curves, TDP, undervolting) far
-easier to use through z13gui. See the
+GTK4 overlay that communicates with z13ctl through its daemon. It provides
+graphical controls for power automation, CPU policy, expanded telemetry, refresh
+rate, and tuning. Display posture/rotation and scripting remain CLI/API workflows.
+See the
 [z13gui README](https://github.com/aic0d3r/z13gui-plus#readme) for installation
 instructions.
 
