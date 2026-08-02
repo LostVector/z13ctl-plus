@@ -7,6 +7,8 @@
 *.dll
 *.so
 *.dylib
+z13ctl-plus
+# Legacy pre-v2 local build artifact.
 z13ctl
 dist/
 
@@ -29,6 +31,7 @@ go.work.sum
 
 # env file
 .env
+.venv/
 
 # Release notes staged for git tag annotation (passed via `git tag -a -F`)
 release-notes.md

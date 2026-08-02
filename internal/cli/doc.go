@@ -1,5 +1,5 @@
 // Package cli provides CLI input parsing, color resolution, dry-run display
-// helpers, and sysfs path discovery for z13ctl subcommands.
+// helpers, and sysfs path discovery for z13ctl-plus subcommands.
 //
 // File layout:
 //

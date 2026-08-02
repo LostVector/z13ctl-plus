@@ -1,11 +1,11 @@
 # Quick Start
 
 These examples assume you have [installed z13ctl-plus](installation.md) and run
-`sudo z13ctl setup`. Most direct hardware commands work without the daemon.
+`sudo z13ctl-plus setup`. Most direct hardware commands work without the daemon.
 Named presets, automatic power-source switching, display intents, and persisted
 state operations require it.
 
-!!! tip "Prefer not to use the command line? Use z13gui"
+!!! tip "Prefer not to use the command line? Use Z13GUI+"
     **[Z13GUI+](https://github.com/aic0d3r/z13gui-plus)** provides touch-friendly
     controls for power automation, CPU policy, expanded telemetry, refresh rate,
     and tuning through the daemon. Display posture/rotation and scripting remain
@@ -19,15 +19,15 @@ Create or update the recommended source-specific presets, assign them, and apply
 the configuration for the current power source:
 
 ```sh
-z13ctl preset restore-recommended
-z13ctl preset policy --enable --ac "Plugged In" --battery "On Battery"
-z13ctl preset list
+z13ctl-plus preset restore-recommended
+z13ctl-plus preset policy --enable --ac "Plugged In" --battery "On Battery"
+z13ctl-plus preset list
 ```
 
 Apply any saved configuration manually without changing the assignments:
 
 ```sh
-z13ctl preset apply "On Battery"
+z13ctl-plus preset apply "On Battery"
 ```
 
 The daemon preserves a manual selection until the next real AC/battery transition.
@@ -40,8 +40,8 @@ Publish internal-panel posture and rotation intent to the daemon's KDE display
 coordinator:
 
 ```sh
-z13ctl display posture tablet
-z13ctl display rotation right
+z13ctl-plus display posture tablet
+z13ctl-plus display rotation right
 ```
 
 The coordinator combines scale, rotation, and preset refresh-rate changes without
@@ -53,25 +53,25 @@ modifying external displays.
 
 ```sh
 # Solid cyan at full brightness (keyboard + lightbar)
-z13ctl apply --color cyan --brightness high
+z13ctl-plus apply --color cyan --brightness high
 
 # Breathing red, slow pulse
-z13ctl apply --mode breathe --color red --speed slow
+z13ctl-plus apply --mode breathe --color red --speed slow
 
 # Breathing between two colors
-z13ctl apply --mode breathe --color hotpink --color2 blue
+z13ctl-plus apply --mode breathe --color hotpink --color2 blue
 
 # Rainbow wave across both zones
-z13ctl apply --mode rainbow --speed normal
+z13ctl-plus apply --mode rainbow --speed normal
 
 # Spectrum cycle, fast
-z13ctl apply --mode cycle --speed fast
+z13ctl-plus apply --mode cycle --speed fast
 
 # Strobe white
-z13ctl apply --mode strobe --color white
+z13ctl-plus apply --mode strobe --color white
 
 # Turn off all lighting
-z13ctl off
+z13ctl-plus off
 ```
 
 ---
@@ -80,10 +80,10 @@ z13ctl off
 
 ```sh
 # Adjust brightness without changing mode or color
-z13ctl brightness high
-z13ctl brightness medium
-z13ctl brightness low
-z13ctl brightness off
+z13ctl-plus brightness high
+z13ctl-plus brightness medium
+z13ctl-plus brightness low
+z13ctl-plus brightness off
 ```
 
 ---
@@ -92,12 +92,12 @@ z13ctl brightness off
 
 ```sh
 # Check current profile
-z13ctl profile --get
+z13ctl-plus profile --get
 
 # Switch profiles
-z13ctl profile --set performance
-z13ctl profile --set balanced
-z13ctl profile --set quiet
+z13ctl-plus profile --set performance
+z13ctl-plus profile --set balanced
+z13ctl-plus profile --set quiet
 ```
 
 ---
@@ -106,13 +106,13 @@ z13ctl profile --set quiet
 
 ```sh
 # Check current limit
-z13ctl batterylimit --get
+z13ctl-plus batterylimit --get
 
 # Cap charging at 80% (recommended for mostly-plugged-in use)
-z13ctl batterylimit --set 80
+z13ctl-plus batterylimit --set 80
 
 # Remove the limit (charge to 100%)
-z13ctl batterylimit --set 100
+z13ctl-plus batterylimit --set 100
 ```
 
 ---
@@ -124,16 +124,16 @@ both fans simultaneously.
 
 ```sh
 # Check current fan curves
-z13ctl fancurve --get
+z13ctl-plus fancurve --get
 
 # Set a custom fan curve using PWM values (8 temp:speed pairs, both fans)
-z13ctl fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
+z13ctl-plus fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
 
 # Or use percentages (0–100%)
-z13ctl fancurve --set "48:1%,53:9%,57:12%,60:17%,63:22%,65:27%,70:35%,76:40%"
+z13ctl-plus fancurve --set "48:1%,53:9%,57:12%,60:17%,63:22%,65:27%,70:35%,76:40%"
 
 # Reset both fans to firmware auto mode
-z13ctl fancurve --reset
+z13ctl-plus fancurve --reset
 ```
 
 ---
@@ -152,19 +152,19 @@ TDP value is an independent override and does not change the physical profile.
 
 ```sh
 # Check current TDP/PPT values
-z13ctl tdp --get
+z13ctl-plus tdp --get
 
 # Set all PPT limits to 50W
-z13ctl tdp --set 50
+z13ctl-plus tdp --set 50
 
 # Set with individual PL overrides
-z13ctl tdp --set 45 --pl2 55 --pl3 60
+z13ctl-plus tdp --set 45 --pl2 55 --pl3 60
 
 # Force high TDP (above 75W, fans set to 80% minimum)
-z13ctl tdp --set 85 --force
+z13ctl-plus tdp --set 85 --force
 
 # Reset TDP to the current profile's firmware defaults
-z13ctl tdp --reset
+z13ctl-plus tdp --reset
 ```
 
 ---
@@ -180,13 +180,13 @@ it automatically on startup and resume while the override is active.
 
 ```sh
 # Check current CO value
-z13ctl undervolt --get
+z13ctl-plus undervolt --get
 
 # Set CPU CO to -20
-z13ctl undervolt --set -20
+z13ctl-plus undervolt --set -20
 
 # Reset to stock voltage
-z13ctl undervolt --reset
+z13ctl-plus undervolt --reset
 ```
 
 Safety limit (matching G-Helper defaults): CPU 0 to -40.
@@ -201,14 +201,14 @@ others.
 
 ```sh
 # Set up independent overrides
-z13ctl fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
-z13ctl tdp --set 50
+z13ctl-plus fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
+z13ctl-plus tdp --set 50
 
 # Change the physical profile without dropping overrides
-z13ctl profile --set balanced
+z13ctl-plus profile --set balanced
 
 # Reset only TDP
-z13ctl tdp --reset
+z13ctl-plus tdp --reset
 ```
 
 ---
@@ -219,11 +219,11 @@ Use `--device` to target only the keyboard or lightbar:
 
 ```sh
 # Keyboard to red, lightbar to blue
-z13ctl apply --color red --device keyboard
-z13ctl apply --color blue --device lightbar
+z13ctl-plus apply --color red --device keyboard
+z13ctl-plus apply --color blue --device lightbar
 
 # Turn off just the lightbar
-z13ctl off --device lightbar
+z13ctl-plus off --device lightbar
 ```
 
 ---
@@ -234,8 +234,8 @@ z13ctl off --device lightbar
 touching any hardware:
 
 ```sh
-z13ctl --dry-run apply --mode rainbow --speed fast
-z13ctl --dry-run setup
+z13ctl-plus --dry-run apply --mode rainbow --speed fast
+z13ctl-plus --dry-run setup
 ```
 
 ---
@@ -243,7 +243,7 @@ z13ctl --dry-run setup
 ## See all named colors
 
 ```sh
-z13ctl apply --list-colors
+z13ctl-plus apply --list-colors
 ```
 
 This prints a live swatch table in your terminal. Any 6-digit hex value
@@ -256,5 +256,5 @@ This prints a live swatch table in your terminal. Any 6-digit hex value
 - [Commands](commands.md) — every flag and option for every command
 - [Daemon](daemon.md) — set up the daemon for state persistence, boot
   restore, and sleep/resume recovery
-- [z13gui](https://github.com/aic0d3r/z13gui-plus) — graphical interface for all
+- [Z13GUI+](https://github.com/aic0d3r/z13gui-plus) — graphical interface for all
   z13ctl-plus features (touch-friendly GTK4 overlay)

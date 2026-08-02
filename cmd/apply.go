@@ -6,10 +6,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/aura"
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
+	"github.com/aic0d3r/z13ctl-plus/internal/hid"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/aura"
-	"github.com/dahui/z13ctl/internal/cli"
-	"github.com/dahui/z13ctl/internal/hid"
 
 	"github.com/spf13/cobra"
 )
@@ -26,10 +26,10 @@ var (
 var applyCmd = &cobra.Command{
 	Use:   "apply",
 	Short: "Apply a lighting effect",
-	Example: `  z13ctl apply --color cyan --brightness high
-  z13ctl apply --mode rainbow --speed slow
-  z13ctl apply --mode breathe --color hotpink --color2 blue
-  z13ctl apply --list-colors`,
+	Example: `  z13ctl-plus apply --color cyan --brightness high
+  z13ctl-plus apply --mode rainbow --speed slow
+  z13ctl-plus apply --mode breathe --color hotpink --color2 blue
+  z13ctl-plus apply --list-colors`,
 	RunE: func(cmd *cobra.Command, _ []string) error {
 		if listColorsFlag {
 			cli.PrintColorList()

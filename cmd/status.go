@@ -9,7 +9,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dahui/z13ctl/internal/cli"
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 
 	"github.com/spf13/cobra"
 )

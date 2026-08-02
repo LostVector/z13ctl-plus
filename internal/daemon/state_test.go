@@ -113,7 +113,7 @@ func TestLoadState_InvalidJSON(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", dir)
 
-	path := filepath.Join(dir, "z13ctl", "state.json")
+	path := filepath.Join(dir, "z13ctl-plus", "state.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
@@ -129,7 +129,7 @@ func TestLoadState_InvalidJSON(t *testing.T) {
 func TestLoadState_ExistingEmptyStateIsNotFresh(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", dir)
-	path := filepath.Join(dir, "z13ctl", "state.json")
+	path := filepath.Join(dir, "z13ctl-plus", "state.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
@@ -144,7 +144,7 @@ func TestLoadState_ExistingEmptyStateIsNotFresh(t *testing.T) {
 func TestLoadStateRejectsNewerSchema(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", dir)
-	path := filepath.Join(dir, "z13ctl", "state.json")
+	path := filepath.Join(dir, "z13ctl-plus", "state.json")
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		t.Fatal(err)
 	}
@@ -195,5 +195,69 @@ func TestMigrateLegacyPhysicalStateClearsDormantTuning(t *testing.T) {
 	migrateState(&s, "performance")
 	if s.Profile != "quiet" || s.FanCurve != nil || s.TDP != nil || s.Undervolt != nil {
 		t.Fatalf("migrated physical state = %+v", s)
+	}
+}
+
+func TestMigrateLegacyStateCopiesWithoutOverwrite(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	legacy := []byte(`{"schema_version":1,"profile":"balanced"}`)
+	if err := os.MkdirAll(filepath.Dir(LegacyStatePath()), 0o750); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(LegacyStatePath(), legacy, 0o600); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := MigrateLegacyState(); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(StatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(legacy) {
+		t.Fatalf("migrated state = %q, want %q", got, legacy)
+	}
+
+	if writeErr := os.WriteFile(LegacyStatePath(), []byte(`{"profile":"performance"}`), 0o600); writeErr != nil {
+		t.Fatal(writeErr)
+	}
+	if migrateErr := MigrateLegacyState(); migrateErr == nil {
+		t.Fatal("MigrateLegacyState overwrote existing plus state")
+	}
+	got, err = os.ReadFile(StatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != string(legacy) {
+		t.Fatalf("state changed after refused migration: %q", got)
+	}
+}
+
+func TestMigrateLegacyStateRejectsInvalidState(t *testing.T) {
+	tests := []struct {
+		name string
+		data []byte
+	}{
+		{name: "invalid JSON", data: []byte("not-json")},
+		{name: "newer schema", data: []byte(`{"schema_version":999}`)},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("XDG_STATE_HOME", t.TempDir())
+			if err := os.MkdirAll(filepath.Dir(LegacyStatePath()), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(LegacyStatePath(), tt.data, 0o600); err != nil {
+				t.Fatal(err)
+			}
+
+			if err := MigrateLegacyState(); err == nil {
+				t.Fatal("MigrateLegacyState accepted invalid state")
+			}
+			if _, err := os.Stat(StatePath()); !os.IsNotExist(err) {
+				t.Fatalf("plus state exists after invalid migration: %v", err)
+			}
+		})
 	}
 }

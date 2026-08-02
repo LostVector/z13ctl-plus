@@ -32,20 +32,70 @@ func defaultState() api.State {
 	}
 }
 
-// statePath returns the XDG-compliant path for the state file.
-func statePath() string {
+// StatePath returns the XDG-compliant path for the z13ctl-plus state file.
+func StatePath() string {
 	base := os.Getenv("XDG_STATE_HOME")
 	if base == "" {
 		home, _ := os.UserHomeDir()
 		base = filepath.Join(home, ".local", "state")
 	}
-	return filepath.Join(base, "z13ctl", "state.json")
+	return filepath.Join(base, "z13ctl-plus", "state.json")
+}
+
+// LegacyStatePath returns the state path used before the v2 namespace change.
+func LegacyStatePath() string {
+	return filepath.Join(filepath.Dir(filepath.Dir(StatePath())), "z13ctl", "state.json")
+}
+
+// MigrateLegacyState validates and copies legacy state without overwriting plus state.
+func MigrateLegacyState() error {
+	source := LegacyStatePath()
+	destination := StatePath()
+
+	data, err := os.ReadFile(source)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("legacy state does not exist: %s", source)
+	}
+	if err != nil {
+		return fmt.Errorf("read legacy state: %w", err)
+	}
+	var state *api.State
+	if unmarshalErr := json.Unmarshal(data, &state); unmarshalErr != nil || state == nil {
+		return fmt.Errorf("legacy state is not valid JSON")
+	}
+	if state.SchemaVersion > api.StateSchemaVersion {
+		return fmt.Errorf("legacy state schema %d is newer than supported schema %d", state.SchemaVersion, api.StateSchemaVersion)
+	}
+
+	if mkdirErr := os.MkdirAll(filepath.Dir(destination), 0o750); mkdirErr != nil {
+		return fmt.Errorf("create state directory: %w", mkdirErr)
+	}
+	tmp, err := os.CreateTemp(filepath.Dir(destination), ".state.json.migrate-*")
+	if err != nil {
+		return fmt.Errorf("create temporary state file: %w", err)
+	}
+	defer func() {
+		_ = tmp.Close()
+		_ = os.Remove(tmp.Name())
+	}()
+	if _, err := tmp.Write(data); err != nil {
+		return fmt.Errorf("write temporary state file: %w", err)
+	}
+	if err := tmp.Close(); err != nil {
+		return fmt.Errorf("close temporary state file: %w", err)
+	}
+	if err := os.Link(tmp.Name(), destination); os.IsExist(err) {
+		return fmt.Errorf("z13ctl-plus state already exists: %s", destination)
+	} else if err != nil {
+		return fmt.Errorf("install migrated state: %w", err)
+	}
+	return nil
 }
 
 // loadState reads persisted state. The bool reports whether no state file
 // exists yet; malformed existing state must not be treated as a fresh install.
 func loadState() (api.State, bool, error) {
-	data, err := os.ReadFile(statePath())
+	data, err := os.ReadFile(StatePath())
 	if err != nil {
 		if os.IsNotExist(err) {
 			return defaultState(), true, nil
@@ -129,7 +179,7 @@ func isPhysicalProfile(profile string) bool {
 func saveState(s api.State) error {
 	stateSaveMu.Lock()
 	defer stateSaveMu.Unlock()
-	path := statePath()
+	path := StatePath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}

@@ -1,11 +1,11 @@
 [Unit]
 Description=z13ctl-plus device daemon
-Requires=z13ctl.socket
-After=z13ctl.socket
+Requires=z13ctl-plus.socket
+After=z13ctl-plus.socket
 
 [Service]
 Type=notify
-ExecStart=z13ctl daemon
+ExecStart=z13ctl-plus daemon
 Restart=on-failure
 StandardOutput=journal
 StandardError=journal

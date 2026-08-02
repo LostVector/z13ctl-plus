@@ -1,6 +1,6 @@
 site_name: z13ctl-plus
 site_url: https://aic0d3r.github.io/z13ctl-plus
-site_description: Compatibility-preserving z13ctl distribution with power automation, composable tuning, coordinated display state, and expanded telemetry.
+site_description: Independently named dahui/z13ctl-compatible fork with power automation, composable tuning, coordinated display state, and expanded telemetry.
 
 repo_url: https://github.com/aic0d3r/z13ctl-plus
 repo_name: aic0d3r/z13ctl-plus

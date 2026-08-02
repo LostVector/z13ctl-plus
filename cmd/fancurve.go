@@ -9,8 +9,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -118,7 +118,7 @@ func runFanCurveSet() error {
 	}
 
 	if err := cli.SetBothFanCurves(points); err != nil {
-		return fmt.Errorf("setting fan curves: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
+		return fmt.Errorf("setting fan curves: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
 	}
 	fmt.Println("Fan curves set for both fans (custom mode enabled)")
 	return nil
@@ -138,7 +138,7 @@ func runFanCurveReset() error {
 		return nil
 	}
 	if err := cli.ResetAllFanCurves(); err != nil {
-		return fmt.Errorf("resetting fan curves: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
+		return fmt.Errorf("resetting fan curves: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
 	}
 	fmt.Println("Fan curves reset to auto mode (both fans)")
 	return nil

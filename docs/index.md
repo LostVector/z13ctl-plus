@@ -5,9 +5,15 @@ display state, and expanded telemetry for the **2025 ASUS ROG Flow Z13** on Linu
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/aic0d3r/z13ctl-plus/blob/main/LICENSE)
 
-`z13ctl-plus` is a compatibility-preserving distribution of
-[`dahui/z13ctl`](https://github.com/dahui/z13ctl). It installs the `z13ctl`
-command and retains the canonical `github.com/dahui/z13ctl/api` Go API.
+`z13ctl-plus` is an independently named compatible fork of
+[`dahui/z13ctl`](https://github.com/dahui/z13ctl). It preserves intentional Go
+API and daemon wire compatibility while using an independent command and runtime
+namespace, so it can be installed alongside upstream.
+
+The installed command is only `z13ctl-plus`. The root Go module is
+`github.com/aic0d3r/z13ctl-plus`; the separate compatible API import remains
+`github.com/dahui/z13ctl/api`. Plus clients must select matching fork API source
+because upstream API source targets the upstream socket.
 
 ---
 
@@ -39,7 +45,7 @@ command and retains the canonical `github.com/dahui/z13ctl/api` Go API.
 - Linux kernel with `hidraw` support
 - 2025 ASUS ROG Flow Z13 (USB IDs `0b05:18c6` and `0b05:1a30`)
 - Read/write access to the relevant `hidraw` and sysfs files — either run as root,
-  or use [`z13ctl setup`](commands.md#setup) to install udev rules granting access
+  or use [`z13ctl-plus setup`](commands.md#setup) to install udev rules granting access
   to a group
 
 ---

@@ -3,8 +3,8 @@ package daemon
 import (
 	"testing"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 )
 
 func TestPlanTuningHighTDPSafetyIsTemporary(t *testing.T) {

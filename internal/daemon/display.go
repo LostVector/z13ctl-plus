@@ -10,7 +10,7 @@ import (
 	"slices"
 	"time"
 
-	"github.com/dahui/z13ctl/internal/cli"
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 )
 
 const (

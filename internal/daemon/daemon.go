@@ -1,11 +1,11 @@
-// Package daemon implements the z13ctl long-running daemon: Unix socket server,
+// Package daemon implements the z13ctl-plus long-running daemon: Unix socket server,
 // hardware device management, state persistence, and Armoury Crate button watcher.
 //
 // Designed as a systemd user service using two units:
-//   - z13ctl.socket  — systemd manages the socket fd (socket activation)
-//   - z13ctl.service — Type=notify, Restart=on-failure
+//   - z13ctl-plus.socket  — systemd manages the socket fd (socket activation)
+//   - z13ctl-plus.service — Type=notify, Restart=on-failure
 //
-// Can also be run directly for development: z13ctl daemon.
+// Can also be run directly for development: z13ctl-plus daemon.
 //
 // The daemon socket client (Send*, Subscribe, SocketPath) lives in the public
 // api package: github.com/dahui/z13ctl/api.
@@ -26,13 +26,13 @@ import (
 	"github.com/coreos/go-systemd/v22/activation"
 	sddaemon "github.com/coreos/go-systemd/v22/daemon"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/aura"
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
+	"github.com/aic0d3r/z13ctl-plus/internal/hid"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/aura"
-	"github.com/dahui/z13ctl/internal/cli"
-	"github.com/dahui/z13ctl/internal/hid"
 )
 
-// Daemon holds the runtime state for the long-running z13ctl process.
+// Daemon holds the runtime state for the long-running z13ctl-plus process.
 type Daemon struct {
 	mu          sync.Mutex
 	applyMu     sync.Mutex
@@ -143,7 +143,7 @@ func Run(ctx context.Context, watchBtn bool) error {
 	if _, err := sddaemon.SdNotify(false, sddaemon.SdNotifyReady); err != nil {
 		slog.Warn("sd_notify READY failed", "err", err)
 	}
-	slog.Info("z13ctl daemon ready", "socket", ln.Addr())
+	slog.Info("z13ctl-plus daemon ready", "socket", ln.Addr())
 
 	go d.broadcastLoop(ctx)
 

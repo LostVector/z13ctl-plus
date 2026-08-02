@@ -1,11 +1,11 @@
 package cmd
 
-// daemon.go — "daemon" subcommand: run the z13ctl long-running device daemon.
+// daemon.go — "daemon" subcommand: run the z13ctl-plus long-running device daemon.
 //
 // The daemon holds HID devices open, restores lighting state on startup,
 // watches the Armoury Crate button, and serves a Unix socket for CLI and GUI
-// clients. Designed to run as a systemd user service (z13ctl.socket +
-// z13ctl.service); can also be launched directly for development.
+// clients. Designed to run as a systemd user service (z13ctl-plus.socket +
+// z13ctl-plus.service); can also be launched directly for development.
 
 import (
 	"context"
@@ -16,17 +16,17 @@ import (
 
 	"github.com/spf13/cobra"
 
-	"github.com/dahui/z13ctl/internal/daemon"
+	"github.com/aic0d3r/z13ctl-plus/internal/daemon"
 )
 
 var daemonCmd = &cobra.Command{
 	Use:   "daemon",
-	Short: "Run the z13ctl device daemon",
-	Long: `Run the z13ctl daemon as a long-running process.
+	Short: "Run the z13ctl-plus device daemon",
+	Long: `Run the z13ctl-plus daemon as a long-running process.
 
 The daemon opens and holds the ASUS HID devices, restores the last-applied
 lighting state on startup, watches the Armoury Crate button, and serves a
-Unix socket at $XDG_RUNTIME_DIR/z13ctl/z13ctl.sock.
+Unix socket at $XDG_RUNTIME_DIR/z13ctl-plus/z13ctl-plus.sock.
 
 CLI commands (apply, off, brightness, profile, batterylimit, bootsound,
 paneloverdrive) will automatically use the socket if the daemon is running,
@@ -37,7 +37,7 @@ tools to exclusively grab the button device.
 
 The daemon is intended to be managed by systemd:
 
-  systemctl --user enable --now z13ctl.socket
+  systemctl --user enable --now z13ctl-plus.socket
 
 The contrib/systemd/user/ directory contains ready-to-use unit files.`,
 	Args: cobra.NoArgs,
@@ -45,11 +45,11 @@ The contrib/systemd/user/ directory contains ready-to-use unit files.`,
 		ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer cancel()
 
-		slog.Info("starting z13ctl daemon")
+		slog.Info("starting z13ctl-plus daemon")
 		if err := daemon.Run(ctx, !noButtonFlag); err != nil {
 			return err
 		}
-		slog.Info("z13ctl daemon stopped")
+		slog.Info("z13ctl-plus daemon stopped")
 		return nil
 	},
 }

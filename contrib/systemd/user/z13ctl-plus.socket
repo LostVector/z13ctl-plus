@@ -2,7 +2,7 @@
 Description=z13ctl-plus control socket
 
 [Socket]
-ListenStream=%t/z13ctl/z13ctl.sock
+ListenStream=%t/z13ctl-plus/z13ctl-plus.sock
 SocketMode=0660
 DirectoryMode=0750
 

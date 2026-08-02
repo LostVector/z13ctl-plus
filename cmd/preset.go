@@ -27,7 +27,7 @@ var presetListCmd = &cobra.Command{
 			return err
 		}
 		if !handled {
-			return fmt.Errorf("preset management requires the z13ctl daemon")
+			return fmt.Errorf("preset management requires the z13ctl-plus daemon")
 		}
 		names := slices.Sorted(maps.Keys(state.Presets))
 		for _, name := range names {
@@ -60,7 +60,7 @@ var presetRestoreRecommendedCmd = &cobra.Command{
 			return err
 		}
 		if !handled {
-			return fmt.Errorf("restoring recommended presets requires the z13ctl daemon")
+			return fmt.Errorf("restoring recommended presets requires the z13ctl-plus daemon")
 		}
 		return nil
 	},
@@ -81,7 +81,7 @@ func presetAction(use, short string, send func(string) (bool, error)) *cobra.Com
 				return err
 			}
 			if !handled {
-				return fmt.Errorf("preset management requires the z13ctl daemon")
+				return fmt.Errorf("preset management requires the z13ctl-plus daemon")
 			}
 			return nil
 		},
@@ -127,7 +127,7 @@ var presetPolicyCmd = &cobra.Command{
 			return err
 		}
 		if !handled {
-			return fmt.Errorf("preset management requires the z13ctl daemon")
+			return fmt.Errorf("preset management requires the z13ctl-plus daemon")
 		}
 		return nil
 	},

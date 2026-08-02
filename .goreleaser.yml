@@ -7,17 +7,17 @@ before:
     - go mod tidy
 
 builds:
-  - id: z13ctl
-    binary: z13ctl
+  - id: z13ctl-plus
+    binary: z13ctl-plus
     ldflags:
-      - -s -w -X github.com/dahui/z13ctl/cmd.Version={{.Version}}
+      - -s -w -X github.com/aic0d3r/z13ctl-plus/cmd.Version={{.Version}}
     goos:
       - linux
     goarch:
       - amd64
 
 archives:
-  - id: z13ctl
+  - id: z13ctl-plus
     formats: [tar.gz]
     name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
     files:
@@ -30,7 +30,7 @@ checksum:
   name_template: "checksums.txt"
 
 nfpms:
-  - id: z13ctl-pkg
+  - id: z13ctl-plus-pkg
     package_name: z13ctl-plus
     section: utils
     formats:
@@ -44,12 +44,6 @@ nfpms:
     dependencies:
       - systemd
       - dbus
-    provides:
-      - z13ctl
-    conflicts:
-      - z13ctl
-    replaces:
-      - z13ctl
     scripts:
       postinstall: contrib/nfpm/postinstall.sh
       preremove: contrib/nfpm/preremove.sh
@@ -57,14 +51,14 @@ nfpms:
     contents:
       - src: LICENSE
         dst: /usr/share/licenses/z13ctl-plus/LICENSE
-      - src: contrib/systemd/user/z13ctl.socket
-        dst: /usr/lib/systemd/user/z13ctl.socket
-      - src: contrib/systemd/user/z13ctl.service
-        dst: /usr/lib/systemd/user/z13ctl.service
-      - src: contrib/systemd/system/z13ctl-perms.service
-        dst: /usr/lib/systemd/system/z13ctl-perms.service
-      - src: contrib/udev/99-z13ctl.rules
-        dst: /usr/lib/udev/rules.d/99-z13ctl.rules
+      - src: contrib/systemd/user/z13ctl-plus.socket
+        dst: /usr/lib/systemd/user/z13ctl-plus.socket
+      - src: contrib/systemd/user/z13ctl-plus.service
+        dst: /usr/lib/systemd/user/z13ctl-plus.service
+      - src: contrib/systemd/system/z13ctl-plus-perms.service
+        dst: /usr/lib/systemd/system/z13ctl-plus-perms.service
+      - src: contrib/udev/99-z13ctl-plus.rules
+        dst: /usr/lib/udev/rules.d/99-z13ctl-plus.rules
     archlinux:
       packager: "aic0d3r <funforfreeapps@gmail.com>"
     overrides:
@@ -89,6 +83,6 @@ release:
 
     ---
 
-    **z13ctl-plus** is a compatibility-preserving distribution of
-    [dahui/z13ctl](https://github.com/dahui/z13ctl). The installed command and
-    runtime interfaces remain `z13ctl`.
+    **z13ctl-plus** is an independently named fork of
+    [dahui/z13ctl](https://github.com/dahui/z13ctl) that preserves compatible
+    API and protocol interfaces where practical.

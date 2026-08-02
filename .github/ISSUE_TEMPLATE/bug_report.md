@@ -9,7 +9,7 @@ A clear description of what the problem is.
 
 **To reproduce**
 Steps to reproduce the behavior:
-1. Run `z13ctl ...`
+1. Run `z13ctl-plus ...`
 2. ...
 
 **Expected behavior**
@@ -21,10 +21,11 @@ What actually happened. Include any error messages or unexpected output.
 **Environment**
 - Linux distribution and version:
 - Kernel version (`uname -r`):
-- z13ctl-plus version (`z13ctl --version`):
+- z13ctl-plus version (`z13ctl-plus --version`):
 - ASUS ROG Flow Z13 model year:
 - Running as daemon or direct:
 
 **Additional context**
-Any other information: relevant journal logs (`journalctl --user -u z13ctl`),
-`z13ctl list` output, or `z13ctl --dry-run` output.
+Any other information: relevant journal logs
+(`journalctl --user -u z13ctl-plus.service`), `z13ctl-plus list` output, or
+`z13ctl-plus --dry-run` output.

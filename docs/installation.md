@@ -7,7 +7,7 @@
 
 !!! warning "InputPlumber conflict (Bazzite, ChimeraOS, Nobara)"
     On gaming distributions that ship [InputPlumber](https://github.com/ShadowBlip/InputPlumber),
-    the z13ctl daemon's button watcher will fail to open the Armoury Crate button
+    the z13ctl-plus daemon's button watcher will fail to open the Armoury Crate button
     device. InputPlumber ships a built-in profile for the ROG Flow Z13 that grabs
     the device exclusively. See [InputPlumber compatibility](daemon.md#inputplumber-compatibility)
     for the override instructions.
@@ -22,7 +22,7 @@ return a helpful error explaining how to install the module.
     The original `leogx9r/ryzen_smu` does not support Strix Halo (the SoC in
     the 2025 Z13). You must use the
     [amkillam/ryzen_smu](https://github.com/amkillam/ryzen_smu) fork. The
-    `z13ctl` daemon shipped by z13ctl-plus detects the wrong fork at startup and reports
+    `z13ctl-plus` daemon detects the wrong fork at startup and reports
     undervolt as unavailable.
 
 | Distribution | Package | Source |
@@ -46,7 +46,7 @@ sudo make install
 CachyOS kernels that provide amdxdna natively should use that in-tree module.
 It supports NPU power and column-utilization sensors, while older
 `amdxdna-dkms` builds may allow inference but return `EOPNOTSUPP` for the
-sensor query. In that case z13ctl reports `ACTIVE` without inventing watt or
+sensor query. In that case z13ctl-plus reports `ACTIVE` without inventing watt or
 utilization values.
 
 Check which module is selected and validate the runtime:
@@ -82,12 +82,16 @@ reboot
 ```
 
 Do not remove DKMS on an older kernel that lacks a native amdxdna module.
-z13ctl supports both configurations: sensor-capable drivers report watts and
+z13ctl-plus supports both configurations: sensor-capable drivers report watts and
 utilization, while sensorless drivers report activity only.
 
 ---
 
 ## Install
+
+z13ctl-plus installs only the `z13ctl-plus` command. It does not install a
+`z13ctl` alias. Its packages do not provide, conflict with, or replace the
+upstream package, so both projects can be installed at the same time.
 
 === "Release binary"
 
@@ -97,13 +101,13 @@ utilization, while sensorless drivers report activity only.
 
     ```sh
     tar xzf z13ctl-plus_*_linux_amd64.tar.gz
-    sudo install -Dm755 z13ctl /usr/local/bin/z13ctl
+    sudo install -Dm755 z13ctl-plus /usr/local/bin/z13ctl-plus
     ```
 
     **One-time permissions setup** (requires root):
 
     ```sh
-    sudo z13ctl setup
+    sudo z13ctl-plus setup
     ```
 
     Then log out and back in (or run `newgrp users`) for the group membership
@@ -112,12 +116,12 @@ utilization, while sensorless drivers report activity only.
     **Install the systemd user service** (socket activation):
 
     ```sh
-    install -Dm644 contrib/systemd/user/z13ctl.socket \
-        ~/.config/systemd/user/z13ctl.socket
-    install -Dm644 contrib/systemd/user/z13ctl.service \
-        ~/.config/systemd/user/z13ctl.service
+    install -Dm644 contrib/systemd/user/z13ctl-plus.socket \
+        ~/.config/systemd/user/z13ctl-plus.socket
+    install -Dm644 contrib/systemd/user/z13ctl-plus.service \
+        ~/.config/systemd/user/z13ctl-plus.service
     systemctl --user daemon-reload
-    systemctl --user enable --now z13ctl.socket z13ctl.service
+    systemctl --user enable --now z13ctl-plus.socket z13ctl-plus.service
     ```
 
 === "Arch Linux (AUR)"
@@ -129,9 +133,10 @@ utilization, while sensorless drivers report activity only.
     yay -S z13ctl-plus-bin
     ```
 
-    The package installs the binary, udev rules, systemd units, and the
-    battery permissions service automatically. After installing, add your user
-    to the `users` group if not already a member:
+    The package installs the binary, udev rules, systemd units, and the battery
+    permissions service. It leaves the z13ctl-plus user daemon disabled so the
+    package can coexist with upstream. After installing, add your user to the
+    `users` group if not already a member:
 
     ```sh
     sudo usermod -aG users $USER
@@ -156,9 +161,10 @@ utilization, while sensorless drivers report activity only.
     sudo apt install ./z13ctl-plus_*.deb
     ```
 
-    The package installs the binary, udev rules, systemd units, and the
-    battery permissions service automatically. After installing, add your user
-    to the `users` group if not already a member:
+    The package installs the binary, udev rules, systemd units, and the battery
+    permissions service. It leaves the z13ctl-plus user daemon disabled so the
+    package can coexist with upstream. After installing, add your user to the
+    `users` group if not already a member:
 
     ```sh
     sudo usermod -aG users $USER
@@ -175,9 +181,10 @@ utilization, while sensorless drivers report activity only.
     sudo dnf install ./z13ctl-plus_*.rpm
     ```
 
-    The package installs the binary, udev rules, systemd units, and the
-    battery permissions service automatically. After installing, add your user
-    to the `users` group if not already a member:
+    The package installs the binary, udev rules, systemd units, and the battery
+    permissions service. It leaves the z13ctl-plus user daemon disabled so the
+    package can coexist with upstream. After installing, add your user to the
+    `users` group if not already a member:
 
     ```sh
     sudo usermod -aG users $USER
@@ -194,10 +201,11 @@ utilization, while sensorless drivers report activity only.
     cd z13ctl-plus
     make build
     sudo make install
-    sudo z13ctl setup
+    sudo z13ctl-plus setup
     ```
 
-    `make install` installs the compatible `z13ctl` binary to `/usr/local/bin`;
+    `make build` creates `./z13ctl-plus`, and `make install` installs it as
+    `/usr/local/bin/z13ctl-plus`;
     the separate setup command installs its udev rules and permissions service.
 
     Install the systemd user service:
@@ -208,10 +216,83 @@ utilization, while sensorless drivers report activity only.
 
 ---
 
+## Co-installation and daemon choice
+
+Package installation leaves the z13ctl-plus user daemon disabled. Before
+enabling it, stop and disable any other Z13 hardware daemon you chose to replace.
+Run only one project's hardware daemon at a time.
+
+The z13ctl-plus CLI checks only the Plus socket. If that socket is unavailable,
+hardware commands fall back to direct HID/sysfs access. Do not leave the upstream
+daemon running while using z13ctl-plus direct-fallback commands; the two processes
+can otherwise issue competing hardware writes.
+
+To select the Plus daemon after installation:
+
+```sh
+systemctl --user enable --now z13ctl-plus.socket z13ctl-plus.service
+```
+
+---
+
+## Migrate from v1 to v2
+
+v1 of this fork used the upstream `z13ctl` command and runtime paths. Those paths
+are provenance-ambiguous: they may belong to upstream, the old fork, or a mix of
+both. Only disable or remove a legacy path when you know it came from the fork.
+
+Before starting the v2 daemon, switch services and copy state explicitly:
+
+1. Install v2 and run `sudo z13ctl-plus setup`.
+2. If you know the active `z13ctl.socket` and `z13ctl.service` came from v1 of
+   this fork, stop and disable them:
+
+    ```sh
+    systemctl --user disable --now z13ctl.socket z13ctl.service
+    ```
+
+3. Preview and perform the state copy:
+
+    ```sh
+    z13ctl-plus --dry-run migrate-state
+    z13ctl-plus migrate-state
+    ```
+
+4. Enable the v2 units:
+
+    ```sh
+    systemctl --user daemon-reload
+    systemctl --user enable --now z13ctl-plus.socket z13ctl-plus.service
+    ```
+
+`migrate-state` validates and copies
+`$XDG_STATE_HOME/z13ctl/state.json` to
+`$XDG_STATE_HOME/z13ctl-plus/state.json` only when the Plus state file is absent.
+With the normal XDG defaults, the source is
+`~/.local/state/z13ctl/state.json` and the destination is
+`~/.local/state/z13ctl-plus/state.json`. It refuses invalid or missing source
+state and refuses to overwrite existing Plus state. It does not start, stop,
+enable, or disable services, and it does not remove the source state or any old
+artifact.
+
+### Optional legacy cleanup
+
+After v2 state and service behavior are verified, you may remove known v1-fork
+artifacts manually. Potential legacy paths are `/usr/local/bin/z13ctl`,
+`~/.config/systemd/user/z13ctl.socket`,
+`~/.config/systemd/user/z13ctl.service`,
+`/etc/systemd/system/z13ctl-perms.service`,
+`/etc/udev/rules.d/99-z13ctl.rules`, and
+`$XDG_STATE_HOME/z13ctl/`. Do not remove any of them when provenance is unknown
+or when you still use upstream. Prefer the old package's uninstall process for
+package-owned files.
+
+---
+
 ## Verify the installation
 
 ```sh
-z13ctl list
+z13ctl-plus list
 ```
 
 This should print the discovered hidraw devices and confirm Aura support.
@@ -222,18 +303,18 @@ If it prints nothing, see [Troubleshooting](#troubleshooting) below.
 ## GUI Frontend
 
 **Highly recommended for most users.** Install
-[z13gui](https://github.com/aic0d3r/z13gui-plus) alongside z13ctl-plus — a touch-friendly
-GTK4 overlay that communicates with z13ctl through its daemon. It provides
+[Z13GUI+](https://github.com/aic0d3r/z13gui-plus) alongside z13ctl-plus — a touch-friendly
+GTK4 overlay that communicates with z13ctl-plus through its daemon. It provides
 graphical controls for power automation, CPU policy, expanded telemetry, refresh
 rate, and tuning. Display posture/rotation and scripting remain CLI/API workflows.
 See the
-[z13gui README](https://github.com/aic0d3r/z13gui-plus#readme) for installation
+[Z13GUI+ README](https://github.com/aic0d3r/z13gui-plus#readme) for installation
 instructions.
 
 !!! note "Requires the daemon"
-    z13gui talks to z13ctl over its daemon socket, so make sure the
-    [systemd user service](daemon.md) is installed and enabled (the AUR, `.deb`,
-    and `.rpm` packages do this for you).
+    Z13GUI+ talks to z13ctl-plus over its Plus daemon socket, so make sure the
+    [systemd user service](daemon.md) is enabled after choosing z13ctl-plus as
+    the only hardware daemon. Packages install the units but leave them disabled.
 
 ---
 
@@ -246,9 +327,9 @@ guide to set your first lighting effect, fan curve, and performance profile.
 
 ## What `setup` does
 
-`sudo z13ctl setup` performs four steps:
+`sudo z13ctl-plus setup` performs four steps:
 
-1. Writes `/etc/udev/rules.d/99-z13ctl.rules` — grants the `users` group
+1. Writes `/etc/udev/rules.d/99-z13ctl-plus.rules` — grants the `users` group
    `MODE=0660` / `GROUP=users` on the ASUS HID and input device nodes; uses
    `RUN+=chgrp/chmod` to set permissions on the platform-profile attribute,
    hwmon fan curve attributes (`asus_custom_fan_curve` + `asus` pwm_enable),
@@ -256,7 +337,7 @@ guide to set your first lighting effect, fan curve, and performance profile.
 2. Reloads udev and applies permissions immediately to all currently present
    files — including `ryzen_smu` sysfs files for undervolting (if the module
    is loaded).
-3. Writes `/etc/systemd/system/z13ctl-perms.service` and enables it — a
+3. Writes `/etc/systemd/system/z13ctl-plus-perms.service` and enables it — a
    `Type=oneshot` service that runs `chgrp` + `chmod g+w` on
    `BAT*/charge_control_end_threshold` and `ryzen_smu_drv` sysfs files at boot.
 4. Starts the service immediately so battery limit and undervolt are accessible
@@ -267,18 +348,18 @@ guide to set your first lighting effect, fan curve, and performance profile.
     `asus_nb_wmi` kernel driver late in its `probe()` sequence — after all
     observable udev child-device events have already fired. The `ryzen_smu`
     files are kobjects under `/sys/kernel/`, not udev-managed devices. There
-    is no udev hook that can reliably target either. The `z13ctl-perms.service`
+    is no udev hook that can reliably target either. The `z13ctl-plus-perms.service`
     unit is a self-contained workaround that runs at `sysinit.target`. It has
-    no dependency on the z13ctl binary and can be inspected at any time:
+    no dependency on the z13ctl-plus binary and can be inspected at any time:
 
     ```sh
-    systemctl cat z13ctl-perms.service
+    systemctl cat z13ctl-plus-perms.service
     ```
 
 Use `--dry-run` to preview all changes without root or any side effects:
 
 ```sh
-z13ctl --dry-run setup
+z13ctl-plus --dry-run setup
 ```
 
 ---
@@ -288,20 +369,20 @@ z13ctl --dry-run setup
 Remove the user service first:
 
 ```sh
-systemctl --user disable --now z13ctl.socket z13ctl.service
-rm -f ~/.config/systemd/user/z13ctl.socket \
-      ~/.config/systemd/user/z13ctl.service
+systemctl --user disable --now z13ctl-plus.socket z13ctl-plus.service
+rm -f ~/.config/systemd/user/z13ctl-plus.socket \
+      ~/.config/systemd/user/z13ctl-plus.service
 systemctl --user daemon-reload
 ```
 
 Then remove the binary and system files:
 
 ```sh
-sudo rm /usr/local/bin/z13ctl
-sudo rm /etc/udev/rules.d/99-z13ctl.rules
+sudo rm /usr/local/bin/z13ctl-plus
+sudo rm /etc/udev/rules.d/99-z13ctl-plus.rules
 sudo udevadm control --reload-rules
-sudo systemctl disable --now z13ctl-perms.service
-sudo rm /etc/systemd/system/z13ctl-perms.service
+sudo systemctl disable --now z13ctl-plus-perms.service
+sudo rm /etc/systemd/system/z13ctl-plus-perms.service
 sudo systemctl daemon-reload
 ```
 
@@ -309,7 +390,7 @@ sudo systemctl daemon-reload
 
 ## Troubleshooting
 
-**`z13ctl list` prints nothing**
+**`z13ctl-plus list` prints nothing**
 
 The device was not found. Check that the kernel loaded the `hid` and `hidraw`
 modules:
@@ -325,7 +406,7 @@ specifically (USB IDs `0b05:18c6` and `0b05:1a30`).
 
 **Permission denied**
 
-Run `sudo z13ctl setup` and log out/in to apply the group membership.
+Run `sudo z13ctl-plus setup` and log out/in to apply the group membership.
 Verify with:
 
 ```sh
@@ -343,6 +424,6 @@ is a common cause. See
 **Daemon not starting**
 
 ```sh
-systemctl --user status z13ctl.socket z13ctl.service
-journalctl --user -u z13ctl -n 50
+systemctl --user status z13ctl-plus.socket z13ctl-plus.service
+journalctl --user -u z13ctl-plus.service -n 50
 ```

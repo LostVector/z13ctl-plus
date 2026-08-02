@@ -1,7 +1,7 @@
-// Package api provides the public client interface for the z13ctl daemon.
+// Package api provides the public client interface for the z13ctl-plus daemon.
 // It contains the shared protocol types and socket client functions used by
 // CLI commands, GUI frontends, and any other tool that communicates with the
-// z13ctl daemon over its Unix socket.
+// z13ctl-plus daemon over its Unix socket.
 package api
 
 // StateSchemaVersion is the current persisted state schema.

@@ -1,10 +1,10 @@
 # Commands
 
-!!! tip "Beginners: consider z13gui instead"
+!!! tip "Beginners: consider Z13GUI+ instead"
     This page is the complete CLI reference. Driving the more advanced features
     (custom fan curves, TDP, undervolting) from the command line makes sense for
     Linux veterans and scripting, but if you're newer to Linux you'll likely
-    have an easier time with **[z13gui](https://github.com/aic0d3r/z13gui-plus)**, the
+    have an easier time with **[Z13GUI+](https://github.com/aic0d3r/z13gui-plus)**, the
     touch-friendly graphical frontend that exposes all of these commands as
     point-and-tap controls.
 
@@ -25,7 +25,7 @@ These flags apply to every command.
 Apply a lighting effect to the keyboard backlight, the edge lightbar, or both.
 
 ```
-z13ctl apply [flags]
+z13ctl-plus apply [flags]
 ```
 
 | Flag | Default | Description |
@@ -50,10 +50,10 @@ z13ctl apply [flags]
 All modes accept `--brightness`.
 
 ```sh
-z13ctl apply --color cyan --brightness high
-z13ctl apply --mode rainbow --speed slow
-z13ctl apply --mode breathe --color hotpink --color2 blue --speed slow
-z13ctl apply --list-colors
+z13ctl-plus apply --color cyan --brightness high
+z13ctl-plus apply --mode rainbow --speed slow
+z13ctl-plus apply --mode breathe --color hotpink --color2 blue --speed slow
+z13ctl-plus apply --list-colors
 ```
 
 ---
@@ -63,14 +63,14 @@ z13ctl apply --list-colors
 Set the brightness level without changing the current lighting mode or color.
 
 ```
-z13ctl brightness <level>
+z13ctl-plus brightness <level>
 ```
 
 `<level>` is one of: `off`, `low`, `medium`, `high`
 
 ```sh
-z13ctl brightness medium
-z13ctl brightness off
+z13ctl-plus brightness medium
+z13ctl-plus brightness off
 ```
 
 ---
@@ -80,12 +80,12 @@ z13ctl brightness off
 Turn off all lighting zones (or a specific zone with `--device`).
 
 ```
-z13ctl off
+z13ctl-plus off
 ```
 
 ```sh
-z13ctl off
-z13ctl off --device lightbar
+z13ctl-plus off
+z13ctl-plus off --device lightbar
 ```
 
 ---
@@ -96,7 +96,7 @@ Get or set the system performance profile via the asus-wmi `platform_profile`
 sysfs interface. Root or group access required; see [setup](#setup).
 
 ```
-z13ctl profile [flags]
+z13ctl-plus profile [flags]
 ```
 
 | Flag | Description |
@@ -108,9 +108,9 @@ Valid profiles: `quiet`, `balanced`, `performance`. Profile changes preserve and
 reapply active fan, TDP, and undervolt overrides when the daemon is running.
 
 ```sh
-z13ctl profile --get
-z13ctl profile --set performance
-z13ctl profile --set balanced
+z13ctl-plus profile --get
+z13ctl-plus profile --set performance
+z13ctl-plus profile --set balanced
 ```
 
 !!! note
@@ -126,13 +126,13 @@ the physical profile, fan/TDP/undervolt overrides, CPU minimum/EPP/boost,
 panel overdrive, and display refresh rate. The daemon must be running.
 
 ```sh
-z13ctl preset list
-z13ctl preset save Gaming
-z13ctl preset apply Gaming
-z13ctl preset delete Gaming
-z13ctl preset restore-recommended
-z13ctl preset policy --enable --ac "Plugged In" --battery "On Battery"
-z13ctl preset policy --disable
+z13ctl-plus preset list
+z13ctl-plus preset save Gaming
+z13ctl-plus preset apply Gaming
+z13ctl-plus preset delete Gaming
+z13ctl-plus preset restore-recommended
+z13ctl-plus preset policy --enable --ac "Plugged In" --battery "On Battery"
+z13ctl-plus preset policy --disable
 ```
 
 The first daemon start on a fresh installation sets an 80% charge limit and
@@ -165,14 +165,14 @@ These commands are used by `z13-tablet-kit`; they require the daemon and never
 fall back to direct KScreen writes.
 
 ```sh
-z13ctl display posture desktop
-z13ctl display posture laptop
-z13ctl display posture tablet
-z13ctl display rotation none
-z13ctl display rotation left
+z13ctl-plus display posture desktop
+z13ctl-plus display posture laptop
+z13ctl-plus display posture tablet
+z13ctl-plus display rotation none
+z13ctl-plus display rotation left
 ```
 
-The coordinator is the sole KScreen writer for z13ctl integrations. Desktop and
+The coordinator is the sole KScreen writer for z13ctl-plus integrations. Desktop and
 laptop use scale 1.5; tablet uses scale 2.0. It combines refresh, scale, and
 rotation changes into one transaction for `eDP-1`, never changes external
 outputs, waits for dock topology to settle, and skips all writes while the
@@ -186,7 +186,7 @@ Get or set the battery charge limit via the Linux ACPI `power_supply` sysfs
 interface. Root or group access required; see [setup](#setup).
 
 ```
-z13ctl batterylimit [flags]
+z13ctl-plus batterylimit [flags]
 ```
 
 | Flag | Description |
@@ -197,8 +197,8 @@ z13ctl batterylimit [flags]
 Writing `100` removes any limit (charges to full).
 
 ```sh
-z13ctl batterylimit --get
-z13ctl batterylimit --set 80
+z13ctl-plus batterylimit --get
+z13ctl-plus batterylimit --set 80
 ```
 
 ---
@@ -209,7 +209,7 @@ Get or set the POST boot sound via the `asus-armoury` firmware-attributes sysfs
 interface. Root or group access required; see [setup](#setup).
 
 ```
-z13ctl bootsound [flags]
+z13ctl-plus bootsound [flags]
 ```
 
 | Flag | Description |
@@ -218,8 +218,8 @@ z13ctl bootsound [flags]
 | `--set <value>` | Set boot sound: `0` = off, `1` = on |
 
 ```sh
-z13ctl bootsound --get
-z13ctl bootsound --set 0
+z13ctl-plus bootsound --get
+z13ctl-plus bootsound --set 0
 ```
 
 ---
@@ -231,7 +231,7 @@ firmware-attributes sysfs interface. Root or group access required; see
 [setup](#setup).
 
 ```
-z13ctl paneloverdrive [flags]
+z13ctl-plus paneloverdrive [flags]
 ```
 
 | Flag | Description |
@@ -240,8 +240,8 @@ z13ctl paneloverdrive [flags]
 | `--set <value>` | Set panel overdrive: `0` = off, `1` = on |
 
 ```sh
-z13ctl paneloverdrive --get
-z13ctl paneloverdrive --set 1
+z13ctl-plus paneloverdrive --get
+z13ctl-plus paneloverdrive --set 1
 ```
 
 ---
@@ -253,7 +253,7 @@ Both physical fans cool the same APU, so the same curve is always applied to
 both fans simultaneously. Root or group access required; see [setup](#setup).
 
 ```
-z13ctl fancurve [flags]
+z13ctl-plus fancurve [flags]
 ```
 
 | Flag | Description |
@@ -279,16 +279,16 @@ mixed in the same curve.
 
 ```sh
 # Read current fan curves
-z13ctl fancurve --get
+z13ctl-plus fancurve --get
 
 # Set a custom fan curve using PWM values (both fans)
-z13ctl fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
+z13ctl-plus fancurve --set "48:2,53:22,57:30,60:43,63:56,65:68,70:89,76:102"
 
 # Set a custom fan curve using percentages
-z13ctl fancurve --set "48:1%,53:9%,57:12%,60:17%,63:22%,65:27%,70:35%,76:40%"
+z13ctl-plus fancurve --set "48:1%,53:9%,57:12%,60:17%,63:22%,65:27%,70:35%,76:40%"
 
 # Reset both fans to auto mode
-z13ctl fancurve --reset
+z13ctl-plus fancurve --reset
 ```
 
 ---
@@ -300,7 +300,7 @@ Get, set, or reset TDP (Thermal Design Power) limits via the asus-nb-wmi PPT
 [setup](#setup).
 
 ```
-z13ctl tdp [flags]
+z13ctl-plus tdp [flags]
 ```
 
 | Flag | Description |
@@ -346,19 +346,19 @@ Setting TDP keeps that physical profile and activates an independent override.
 
 ```sh
 # Read current TDP values
-z13ctl tdp --get
+z13ctl-plus tdp --get
 
 # Set all PPT limits to 50W
-z13ctl tdp --set 50
+z13ctl-plus tdp --set 50
 
 # Set with individual PL overrides
-z13ctl tdp --set 45 --pl2 55 --pl3 60
+z13ctl-plus tdp --set 45 --pl2 55 --pl3 60
 
 # Force high TDP (fans use the temporary safety curve)
-z13ctl tdp --set 85 --force
+z13ctl-plus tdp --set 85 --force
 
 # Reset TDP to the current profile's firmware defaults
-z13ctl tdp --reset
+z13ctl-plus tdp --reset
 ```
 
 ---
@@ -371,7 +371,7 @@ thermals without reducing performance. Root or group access required; see
 [setup](#setup).
 
 ```
-z13ctl undervolt [flags]
+z13ctl-plus undervolt [flags]
 ```
 
 | Flag | Description |
@@ -405,16 +405,16 @@ If the module is not installed, undervolt commands return a helpful error.
 
 ```sh
 # Read current CO value
-z13ctl undervolt --get
+z13ctl-plus undervolt --get
 
 # Set CPU CO to -20
-z13ctl undervolt --set -20
+z13ctl-plus undervolt --set -20
 
 # Reset to stock voltage
-z13ctl undervolt --reset
+z13ctl-plus undervolt --reset
 
 # Preview without applying
-z13ctl --dry-run undervolt --set -20
+z13ctl-plus --dry-run undervolt --set -20
 ```
 
 ---
@@ -426,7 +426,7 @@ speed and mode, performance profile, TDP power limits, undervolt status, and
 battery charge level with charge limit.
 
 ```
-z13ctl status
+z13ctl-plus status
 ```
 
 This command is read-only and takes no flags. All values are read directly from
@@ -434,7 +434,7 @@ sysfs (except undervolt, which has no sysfs readback — shows `ryzen_smu`
 module availability).
 
 ```sh
-z13ctl status
+z13ctl-plus status
 # APU:       62°C
 # Fans:      4200 RPM, mode: auto
 # Profile:   balanced
@@ -450,7 +450,7 @@ z13ctl status
 List all matching hidraw devices and show whether each has Aura support.
 
 ```
-z13ctl list
+z13ctl-plus list
 ```
 
 Useful for diagnosing missing devices or verifying that `setup` worked. Does
@@ -467,7 +467,7 @@ asus-nb-wmi PPT power limit attributes for TDP control, and ryzen_smu sysfs
 files for undervolting (if the module is loaded).
 
 ```
-sudo z13ctl setup [flags]
+sudo z13ctl-plus setup [flags]
 ```
 
 | Flag | Default | Description |
@@ -477,8 +477,8 @@ sudo z13ctl setup [flags]
 Use `--dry-run` to preview exactly what would be written — no root required:
 
 ```sh
-z13ctl --dry-run setup    # preview (no root needed)
-sudo z13ctl setup         # apply
+z13ctl-plus --dry-run setup    # preview (no root needed)
+sudo z13ctl-plus setup         # apply
 ```
 
 After running setup, log out and back in (or run `newgrp <group>`) for the
@@ -489,18 +489,35 @@ requires a separate systemd service, see [Installation](installation.md#what-set
 
 ---
 
+## migrate-state
+
+Validate and copy state from the legacy v1 `z13ctl` namespace into the v2 Plus
+namespace:
+
+```sh
+z13ctl-plus --dry-run migrate-state
+z13ctl-plus migrate-state
+```
+
+The command copies only when the Plus state file is absent. It does not remove
+the source or other legacy artifacts and does not change any services. See
+[Migrate from v1 to v2](installation.md#migrate-from-v1-to-v2) for the required
+manual service switch and provenance warning.
+
+---
+
 ## daemon
 
-Start the z13ctl daemon. Normally started automatically via the systemd socket
+Start the z13ctl-plus daemon. Normally started automatically via the systemd socket
 unit — see [Daemon](daemon.md). You can also start it directly for testing.
 
 ```
-z13ctl daemon
+z13ctl-plus daemon
 ```
 
 ```sh
-z13ctl daemon               # with Armoury Crate button watcher
-z13ctl --no-button daemon   # without button watcher
+z13ctl-plus daemon               # with Armoury Crate button watcher
+z13ctl-plus --no-button daemon   # without button watcher
 ```
 
 When the daemon is running, all other commands (`apply`, `brightness`, `off`,
@@ -516,7 +533,7 @@ they fall back to direct hardware or sysfs access.
 Named colors accepted by `--color` and `--color2`. Any 6-digit hex value
 (`RRGGBB`, without `#`) is also accepted.
 
-Run `z13ctl apply --list-colors` to see ANSI true-color swatches in your terminal.
+Run `z13ctl-plus apply --list-colors` to see ANSI true-color swatches in your terminal.
 
 | Name | Hex | Name | Hex |
 |------|-----|------|-----|

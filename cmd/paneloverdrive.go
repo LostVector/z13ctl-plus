@@ -10,8 +10,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -56,7 +56,7 @@ Values:
 			}
 
 			if err := cli.SetPanelOverdrive(value); err != nil {
-				return fmt.Errorf("setting panel overdrive: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
+				return fmt.Errorf("setting panel overdrive: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
 			}
 			fmt.Printf("Panel overdrive set to %d\n", value)
 			return nil

@@ -1,14 +1,14 @@
 VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
-LDFLAGS  := -s -w -X github.com/dahui/z13ctl/cmd.Version=$(VERSION)
+LDFLAGS  := -s -w -X github.com/aic0d3r/z13ctl-plus/cmd.Version=$(VERSION)
 
 SYSTEMD_USER_DIR  := $(HOME)/.config/systemd/user
 SYSTEMD_SYSTEM_DIR := /etc/systemd/system
 
 .PHONY: build test cover lint mod-tidy snapshot release install install-service uninstall-service install-perms-service uninstall-perms-service docs clean help
 
-## build: compile z13ctl with version from git tags
+## build: compile z13ctl-plus with version from git tags
 build:
-	go build -ldflags "$(LDFLAGS)" -o z13ctl .
+	go build -ldflags "$(LDFLAGS)" -o z13ctl-plus .
 
 ## test: run all tests
 test:
@@ -36,37 +36,37 @@ snapshot:
 release:
 	goreleaser release --clean
 
-## install: install z13ctl binary to /usr/local/bin (requires sudo, build first)
+## install: install z13ctl-plus binary to /usr/local/bin (requires sudo, build first)
 install:
-	install -Dm755 z13ctl /usr/local/bin/z13ctl
+	install -Dm755 z13ctl-plus /usr/local/bin/z13ctl-plus
 
-## install-service: install and enable the z13ctl systemd user service
+## install-service: install and enable the z13ctl-plus systemd user service
 install-service:
-	install -Dm644 contrib/systemd/user/z13ctl.socket $(SYSTEMD_USER_DIR)/z13ctl.socket
-	install -Dm644 contrib/systemd/user/z13ctl.service $(SYSTEMD_USER_DIR)/z13ctl.service
+	install -Dm644 contrib/systemd/user/z13ctl-plus.socket $(SYSTEMD_USER_DIR)/z13ctl-plus.socket
+	install -Dm644 contrib/systemd/user/z13ctl-plus.service $(SYSTEMD_USER_DIR)/z13ctl-plus.service
 	systemctl --user daemon-reload
-	systemctl --user enable --now z13ctl.socket z13ctl.service
-	@echo "Service installed. Run 'systemctl --user status z13ctl.service' to verify."
+	systemctl --user enable --now z13ctl-plus.socket z13ctl-plus.service
+	@echo "Service installed. Run 'systemctl --user status z13ctl-plus.service' to verify."
 
-## uninstall-service: stop and remove the z13ctl systemd user service
+## uninstall-service: stop and remove the z13ctl-plus systemd user service
 uninstall-service:
-	-systemctl --user disable --now z13ctl.socket z13ctl.service
-	rm -f $(SYSTEMD_USER_DIR)/z13ctl.socket $(SYSTEMD_USER_DIR)/z13ctl.service
+	-systemctl --user disable --now z13ctl-plus.socket z13ctl-plus.service
+	rm -f $(SYSTEMD_USER_DIR)/z13ctl-plus.socket $(SYSTEMD_USER_DIR)/z13ctl-plus.service
 	systemctl --user daemon-reload
 	@echo "Service removed."
 
 ## install-perms-service: install system service to chmod battery + firmware-attributes sysfs on boot (requires sudo)
 install-perms-service:
-	install -Dm644 contrib/systemd/system/z13ctl-perms.service $(SYSTEMD_SYSTEM_DIR)/z13ctl-perms.service
+	install -Dm644 contrib/systemd/system/z13ctl-plus-perms.service $(SYSTEMD_SYSTEM_DIR)/z13ctl-plus-perms.service
 	systemctl daemon-reload
-	systemctl enable z13ctl-perms.service
-	systemctl restart z13ctl-perms.service
-	@echo "Permissions service installed. Run 'systemctl status z13ctl-perms' to verify."
+	systemctl enable z13ctl-plus-perms.service
+	systemctl restart z13ctl-plus-perms.service
+	@echo "Permissions service installed. Run 'systemctl status z13ctl-plus-perms' to verify."
 
 ## uninstall-perms-service: remove the sysfs permissions service (requires sudo)
 uninstall-perms-service:
-	-systemctl disable --now z13ctl-perms.service
-	rm -f $(SYSTEMD_SYSTEM_DIR)/z13ctl-perms.service
+	-systemctl disable --now z13ctl-plus-perms.service
+	rm -f $(SYSTEMD_SYSTEM_DIR)/z13ctl-plus-perms.service
 	systemctl daemon-reload
 	@echo "Permissions service removed."
 
@@ -76,7 +76,7 @@ docs:
 
 ## clean: remove all generated build and test artifacts
 clean:
-	rm -f z13ctl
+	rm -f z13ctl-plus
 	rm -rf dist/
 	find . -name '*.test' -delete
 	find . -name 'coverage.out' -o -name 'coverage.*' -o -name '*.coverprofile' -o -name 'profile.cov' | xargs rm -f

@@ -1,10 +1,11 @@
 # Daemon
 
-The z13ctl daemon is a long-running background process that provides three things
+The z13ctl-plus daemon is a long-running background process that provides things
 ordinary one-shot CLI invocations cannot:
 
 - **State persistence** — saves your last-applied lighting, profile, battery,
-  fan curve, TDP, and undervolt settings to `~/.local/state/z13ctl/state.json`
+  fan curve, TDP, and undervolt settings to
+  `~/.local/state/z13ctl-plus/state.json`
   and restores them automatically at every boot.
 - **Sleep/resume recovery** — watches for system resume events via D-Bus and
   reapplies lighting and volatile settings (fan curves, TDP, undervolt) that
@@ -24,15 +25,23 @@ daemon socket when it is running. If the daemon is not running they fall back to
 sysfs access transparently — there is no user-visible difference other than
 persistence.
 
+!!! warning "Run only one hardware daemon"
+    z13ctl-plus uses an independent socket and can be co-installed with upstream,
+    but both daemons control the same hardware. Enable only one. The Plus CLI
+    checks only the Plus socket and falls back to direct hardware access when it
+    is unavailable, so do not mix an upstream daemon with Plus direct-fallback
+    commands.
+
 ---
 
 ## Systemd setup (recommended)
 
-z13ctl-plus ships two `z13ctl` systemd user units that use socket activation:
+z13ctl-plus ships two independently named systemd user units that use socket
+activation:
 
-- **`z13ctl.socket`** — systemd creates and manages the Unix socket. The daemon
+- **`z13ctl-plus.socket`** — systemd creates and manages the Unix socket. The daemon
   is started on first use and does not run if nothing has connected.
-- **`z13ctl.service`** — `Type=notify`, `Restart=on-failure`. The daemon sends
+- **`z13ctl-plus.service`** — `Type=notify`, `Restart=on-failure`. The daemon sends
   `sd_notify READY` when it is listening.
 
 The units target `graphical-session.target`, so they work in both desktop
@@ -41,12 +50,12 @@ environments (KDE, GNOME) and Steam Gaming Mode (gamescope session).
 Install and enable:
 
 ```sh
-install -Dm644 contrib/systemd/user/z13ctl.socket \
-    ~/.config/systemd/user/z13ctl.socket
-install -Dm644 contrib/systemd/user/z13ctl.service \
-    ~/.config/systemd/user/z13ctl.service
+install -Dm644 contrib/systemd/user/z13ctl-plus.socket \
+    ~/.config/systemd/user/z13ctl-plus.socket
+install -Dm644 contrib/systemd/user/z13ctl-plus.service \
+    ~/.config/systemd/user/z13ctl-plus.service
 systemctl --user daemon-reload
-systemctl --user enable --now z13ctl.socket z13ctl.service
+systemctl --user enable --now z13ctl-plus.socket z13ctl-plus.service
 ```
 
 Or, if you built from source:
@@ -61,22 +70,22 @@ make install-service
 
 ```sh
 # Check status
-systemctl --user status z13ctl.socket
-systemctl --user status z13ctl.service
+systemctl --user status z13ctl-plus.socket
+systemctl --user status z13ctl-plus.service
 
 # View live logs
-journalctl --user -u z13ctl -f
+journalctl --user -u z13ctl-plus.service -f
 
 # Restart the daemon (e.g., after a config change)
-systemctl --user restart z13ctl.service
+systemctl --user restart z13ctl-plus.service
 ```
 
 ### Remove the user service
 
 ```sh
-systemctl --user disable --now z13ctl.socket z13ctl.service
-rm -f ~/.config/systemd/user/z13ctl.socket \
-      ~/.config/systemd/user/z13ctl.service
+systemctl --user disable --now z13ctl-plus.socket z13ctl-plus.service
+rm -f ~/.config/systemd/user/z13ctl-plus.socket \
+      ~/.config/systemd/user/z13ctl-plus.service
 systemctl --user daemon-reload
 ```
 
@@ -87,23 +96,24 @@ systemctl --user daemon-reload
 Start the daemon directly for testing or on systems without systemd:
 
 ```sh
-z13ctl daemon
+z13ctl-plus daemon
 ```
 
 To disable the Armoury Crate button watcher (e.g., when another tool such as
 a Steam controller mapper needs exclusive access to the button device):
 
 ```sh
-z13ctl --no-button daemon
+z13ctl-plus --no-button daemon
 ```
 
 The daemon listens on a Unix socket at:
 
 ```
-$XDG_RUNTIME_DIR/z13ctl/z13ctl.sock
+$XDG_RUNTIME_DIR/z13ctl-plus/z13ctl-plus.sock
 ```
 
-(falls back to `/tmp/z13ctl/z13ctl.sock` if `XDG_RUNTIME_DIR` is not set).
+(falls back to `/tmp/z13ctl-plus/z13ctl-plus.sock` if `XDG_RUNTIME_DIR` is not
+set).
 
 ---
 
@@ -112,10 +122,12 @@ $XDG_RUNTIME_DIR/z13ctl/z13ctl.sock
 The daemon persists state to:
 
 ```
-~/.local/state/z13ctl/state.json
+$XDG_STATE_HOME/z13ctl-plus/state.json
 ```
 
-The file is written atomically after every successful command. It stores:
+When `XDG_STATE_HOME` is unset, this is normally
+`~/.local/state/z13ctl-plus/state.json`. The file is written atomically after
+every successful command. It stores:
 
 - `lighting` — mode, color, color2, speed, brightness, enabled flag
 - `devices` — per-device overrides (keyboard/lightbar can have independent state)
@@ -184,7 +196,7 @@ This happens transparently with no user intervention. You can verify it worked
 by checking the daemon logs after a resume:
 
 ```sh
-journalctl --user -u z13ctl --since "5 minutes ago"
+journalctl --user -u z13ctl-plus.service --since "5 minutes ago"
 ```
 
 ---
@@ -205,17 +217,17 @@ the saved lighting state — honoring per-device overrides, so a keyboard-specif
 color/mode is restored exactly as you last set it.
 
 This requires no user intervention; the keyboard relights within a few seconds of
-reattachment. If your `z13ctl setup` udev rules are in place, the reattached node
-is granted access automatically. You can verify it in the daemon logs:
+reattachment. If your `z13ctl-plus setup` udev rules are in place, the reattached
+node is granted access automatically. You can verify it in the daemon logs:
 
 ```sh
-journalctl --user -u z13ctl -f
+journalctl --user -u z13ctl-plus.service -f
 # On reattach: keyboard reattached; lighting restored
 ```
 
 !!! note "Daemon required"
     This recovery only happens while the daemon is running. Without it, re-run
-    your `apply` command (or press the Armoury Crate button in z13gui) after
+    your `apply` command (or press the Armoury Crate button in Z13GUI+) after
     reattaching the keyboard.
 
 ---
@@ -239,16 +251,16 @@ See the [API](api.md) page for details.
 On gaming distributions such as Bazzite and ChimeraOS, [InputPlumber](https://github.com/ShadowBlip/InputPlumber)
 ships a built-in device profile for the ROG Flow Z13 (`50-rog_flow_z13.yaml`)
 that grabs `"Asus WMI hotkeys"` as a managed source device. This creates an
-exclusive evdev conflict: z13ctl cannot open the device and will log:
+exclusive evdev conflict: z13ctl-plus cannot open the device and will log:
 
 ```
 button watcher stopped; retrying err="open /dev/input/eventN: permission denied"
 ```
 
 **Workaround:** Create an override config that marks `"Asus WMI hotkeys"` as
-`ignore: true`. This tells InputPlumber to leave that device unmanaged so z13ctl
-can grab it exclusively, while preserving all other InputPlumber functionality
-(controller emulation, touchpad, etc.).
+`ignore: true`. This tells InputPlumber to leave that device unmanaged so
+z13ctl-plus can grab it exclusively, while preserving all other InputPlumber
+functionality (controller emulation, touchpad, etc.).
 
 First, check whether the built-in config exists on your system:
 
@@ -279,7 +291,7 @@ matches:
 
 source_devices:
   - group: keyboard
-    ignore: true        # allow z13ctl to grab this device exclusively
+    ignore: true        # allow z13ctl-plus to grab this device exclusively
     evdev:
       name: Asus WMI hotkeys
       handler: event*
@@ -316,13 +328,13 @@ changed (InputPlumber restricts device node access while managing a device, and 
 not fully restore permissions on shutdown):
 
 ```sh
-sudo z13ctl setup --perms-only
+sudo z13ctl-plus setup --perms-only
 ```
 
-Then confirm z13ctl can grab the button:
+Then confirm z13ctl-plus can grab the button:
 
 ```sh
-journalctl --user -u z13ctl.service -f
+journalctl --user -u z13ctl-plus.service -f
 # Should show: watching Armoury Crate button path=/dev/input/eventN
 ```
 
@@ -330,5 +342,5 @@ Alternatively, disable the button watcher entirely and let InputPlumber handle
 the button exclusively:
 
 ```sh
-z13ctl --no-button daemon
+z13ctl-plus --no-button daemon
 ```

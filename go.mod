@@ -1,4 +1,4 @@
-module github.com/dahui/z13ctl
+module github.com/aic0d3r/z13ctl-plus
 
 go 1.25.0
 

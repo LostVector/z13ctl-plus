@@ -7,8 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -120,7 +120,7 @@ func runUndervoltSet() error {
 	}
 
 	if err := cli.SetCurveOptimizer(cpuOffset); err != nil {
-		return fmt.Errorf("setting curve optimizer: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
+		return fmt.Errorf("setting curve optimizer: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
 	}
 	fmt.Printf("Curve Optimizer set: CPU %d\n", cpuOffset)
 	return nil
@@ -141,7 +141,7 @@ func runUndervoltReset() error {
 	}
 
 	if err := cli.ResetCurveOptimizer(); err != nil {
-		return fmt.Errorf("resetting curve optimizer: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
+		return fmt.Errorf("resetting curve optimizer: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
 	}
 	fmt.Println("Curve Optimizer reset to stock (0)")
 	return nil

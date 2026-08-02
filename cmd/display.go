@@ -30,7 +30,7 @@ func displayIntentCommand(use, short string, send func(string) (bool, error)) *c
 				return err
 			}
 			if !handled {
-				return fmt.Errorf("display coordination requires the z13ctl daemon")
+				return fmt.Errorf("display coordination requires the z13ctl-plus daemon")
 			}
 			return nil
 		},

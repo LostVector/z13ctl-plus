@@ -11,13 +11,13 @@ This repo contains two Go modules:
 
 | Module | Path | Purpose |
 |--------|------|---------|
-| `github.com/dahui/z13ctl` | `.` | Main CLI and daemon binary |
+| `github.com/aic0d3r/z13ctl-plus` | `.` | Main CLI and daemon binary |
 | `github.com/dahui/z13ctl/api` | `./api` | Public client library for external tools |
 
 The `api/` module is stdlib-only so that GUI tools, Decky plugins, and other
 integrations can import it without pulling in the CLI's dependencies.
-These canonical module paths intentionally remain under `dahui/z13ctl` so
-existing consumers stay compatible with the upstream API.
+The root module uses the fork identity. Only the separate API module retains the
+canonical upstream import path for API and wire compatibility.
 
 ---
 
@@ -69,9 +69,10 @@ should include tests for any new behavior.
 
 ## Release workflow (maintainers only)
 
-This distribution retains the canonical `github.com/dahui/z13ctl/api` module
-path. Tagging this fork does not publish that module path; API changes must be
-merged and tagged upstream before external consumers can fetch them.
+The API source retains the canonical `github.com/dahui/z13ctl/api` module path.
+External Plus clients must use a replacement that selects the matching fork API
+source because upstream API source targets the upstream runtime socket. Tagging
+the root fork module does not publish the canonical API module path.
 
 Create an annotated distribution tag to publish z13ctl-plus:
 

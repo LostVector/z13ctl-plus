@@ -9,8 +9,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -57,7 +57,7 @@ Range: 40–100. Writing 100 removes any limit (charges to full).`,
 
 			path := cli.FindBatteryThresholdPath()
 			if err := os.WriteFile(path, []byte(strconv.Itoa(limit)+"\n"), 0o644); err != nil {
-				return fmt.Errorf("setting battery limit: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
+				return fmt.Errorf("setting battery limit: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
 			}
 			fmt.Printf("Battery charge limit set to %d%%\n", limit)
 			return nil

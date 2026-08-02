@@ -73,3 +73,22 @@ func TestStateProtocolIncludesTuningFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestSocketPath(t *testing.T) {
+	tests := []struct {
+		name    string
+		runtime string
+		want    string
+	}{
+		{name: "XDG runtime", runtime: "/run/user/1000", want: "/run/user/1000/z13ctl-plus/z13ctl-plus.sock"},
+		{name: "fallback", want: "/tmp/z13ctl-plus/z13ctl-plus.sock"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("XDG_RUNTIME_DIR", tt.runtime)
+			if got := SocketPath(); got != tt.want {
+				t.Fatalf("SocketPath() = %q, want %q", got, tt.want)
+			}
+		})
+	}
+}

@@ -1,8 +1,8 @@
 # API Module
 
-The `api/` module is a standalone Go library for communicating with the z13ctl
-daemon from external tools — GUI frontends, Decky plugins, shell integrations,
-or anything else that wants to control z13ctl programmatically.
+The `api/` module is a standalone Go library for communicating with the
+z13ctl-plus daemon from external tools — GUI frontends, Decky plugins, shell
+integrations, or anything else that wants to control z13ctl-plus programmatically.
 
 ## Import
 
@@ -13,16 +13,21 @@ import "github.com/dahui/z13ctl/api"
 The module is deliberately stdlib-only (no third-party dependencies) so that
 integrations can pull it in without inheriting the CLI's dependency tree.
 
-!!! note "Canonical import path"
-    z13ctl-plus retains the upstream import path for compatibility. To consume
-    Plus-only API additions, require the matching API version and replace it with
-    the corresponding z13ctl-plus API tag:
+!!! warning "Canonical import path, fork API source"
+    z13ctl-plus retains the upstream import path for API and wire compatibility,
+    but its fork-sourced `SocketPath` targets only the Plus socket. External
+    clients such as z13gui-plus must build against the matching fork API source,
+    not the upstream source at the same import path. For a local checkout:
 
     ```go
-    require github.com/dahui/z13ctl/api v1.3.0
+    require github.com/dahui/z13ctl/api v1.1.6
 
-    replace github.com/dahui/z13ctl/api => github.com/aic0d3r/z13ctl-plus/api v1.3.0
+    replace github.com/dahui/z13ctl/api => ../z13ctl-plus/api
     ```
+
+    Released clients should use the corresponding published fork `api/v*` source
+    as their replacement. Do not combine the upstream API source with the Plus
+    daemon and expect socket discovery to work.
 
 It is a separate Go module at `./api` with its own `go.mod`. If you are working
 on both the main binary and the API library simultaneously, create a
@@ -61,7 +66,8 @@ stream of events.
 
 ```go
 path := api.SocketPath()
-// $XDG_RUNTIME_DIR/z13ctl/z13ctl.sock  (or /tmp/z13ctl/z13ctl.sock)
+// $XDG_RUNTIME_DIR/z13ctl-plus/z13ctl-plus.sock
+// (or /tmp/z13ctl-plus/z13ctl-plus.sock)
 ```
 
 ---
@@ -161,5 +167,6 @@ for event := range ch {
 
 ## Full API reference
 
-See [pkg.go.dev](https://pkg.go.dev/github.com/dahui/z13ctl/api) for full
-documentation of all exported types and functions.
+See [pkg.go.dev](https://pkg.go.dev/github.com/dahui/z13ctl/api) for the compatible
+exported surface. The source displayed there is upstream and targets the upstream
+socket; Plus clients still need the matching fork API source described above.

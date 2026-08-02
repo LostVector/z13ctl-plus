@@ -5,13 +5,13 @@
 //
 // Usage:
 //
-//	z13ctl [--device keyboard|lightbar|PATH] [--dry-run] <command>
+//	z13ctl-plus [--device keyboard|lightbar|PATH] [--dry-run] <command>
 //
 // Commands: apply  brightness  list  off  profile  batterylimit  setup
 package main
 
 import (
-	"github.com/dahui/z13ctl/cmd"
+	"github.com/aic0d3r/z13ctl-plus/cmd"
 	"github.com/spf13/cobra"
 )
 

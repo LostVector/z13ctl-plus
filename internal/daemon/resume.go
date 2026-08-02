@@ -16,7 +16,7 @@ import (
 
 	"github.com/godbus/dbus/v5"
 
-	"github.com/dahui/z13ctl/internal/aura"
+	"github.com/aic0d3r/z13ctl-plus/internal/aura"
 )
 
 // watchResume connects to the system DBus and listens for resume events.

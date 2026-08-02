@@ -9,9 +9,9 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/aura"
+	"github.com/aic0d3r/z13ctl-plus/internal/hid"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/aura"
-	"github.com/dahui/z13ctl/internal/hid"
 )
 
 // auraReportID is the HID Report ID byte that begins every Aura packet (0x5d).

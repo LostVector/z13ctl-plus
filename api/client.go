@@ -1,6 +1,6 @@
 package api
 
-// client.go — socket client for communicating with the z13ctl daemon.
+// client.go — socket client for communicating with the z13ctl-plus daemon.
 //
 // Each Send* function connects to the daemon's Unix socket, sends one JSON
 // command, and reads one JSON response. If the daemon is not running
@@ -26,7 +26,7 @@ func SocketPath() string {
 	if runtime == "" {
 		runtime = "/tmp"
 	}
-	return runtime + "/z13ctl/z13ctl.sock"
+	return runtime + "/z13ctl-plus/z13ctl-plus.sock"
 }
 
 // request is a command sent to the daemon over the socket.

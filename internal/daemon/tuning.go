@@ -4,8 +4,8 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 )
 
 type tuningApplyError struct {

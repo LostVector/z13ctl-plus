@@ -2,18 +2,40 @@
 
 ## What this project is
 
-`z13ctl-plus` is a compatibility-preserving distribution of `dahui/z13ctl` for
+`z13ctl-plus` is an independently named compatible fork of `dahui/z13ctl` for
 controlling RGB lighting, fan curves, TDP (PPT power limits), and system settings
-on the 2025 ASUS ROG Flow Z13. Repository and package identity:
-`github.com/aic0d3r/z13ctl-plus`. Canonical Go module path:
-`github.com/dahui/z13ctl`. Runtime binary, socket/state namespace, systemd units,
-and udev filenames remain `z13ctl`. License: Apache 2.0.
+on the 2025 ASUS ROG Flow Z13. It preserves intentional API and daemon wire
+compatibility, not runtime-name compatibility. Root Go module and repository:
+`github.com/aic0d3r/z13ctl-plus`. License: Apache 2.0.
+
+## v2 namespace invariants
+
+- The only installed command is `z13ctl-plus`; never add a `z13ctl` alias.
+- User units are `z13ctl-plus.socket` and `z13ctl-plus.service`. The system
+  permissions unit is `z13ctl-plus-perms.service`; the udev file is
+  `99-z13ctl-plus.rules`.
+- Runtime socket: `$XDG_RUNTIME_DIR/z13ctl-plus/z13ctl-plus.sock`, falling back
+  to `/tmp/z13ctl-plus/z13ctl-plus.sock` when `XDG_RUNTIME_DIR` is unset.
+- State: `$XDG_STATE_HOME/z13ctl-plus/state.json`, normally
+  `~/.local/state/z13ctl-plus/state.json`.
+- The separate API module intentionally remains `github.com/dahui/z13ctl/api`.
+  Fork API source targets only the Plus socket. External clients such as
+  z13gui-plus must use a replacement selecting the matching fork API source;
+  importing upstream source at the canonical path targets the upstream socket.
+- Packages do not provide, conflict with, or replace upstream and can be
+  co-installed. Package installation leaves the Plus user daemon disabled.
+  Enable only one project's hardware daemon. The Plus CLI checks only the Plus
+  socket, so do not mix an upstream daemon with Plus direct-fallback commands.
+- v1 shared the legacy `z13ctl` runtime namespace. `z13ctl-plus migrate-state`
+  validates and copies legacy state only when Plus state is absent. It never
+  changes services or removes source state/artifacts. Legacy paths are
+  provenance-ambiguous; cleanup must be explicit and limited to known fork files.
 
 ## Package layout
 
 ```
 api/                         Public client API submodule (github.com/dahui/z13ctl/api)
-  go.mod                     Separate module; stdlib only; importable by z13gui and external tools
+  go.mod                     Separate module; stdlib only; importable by z13gui-plus and external tools
   types.go                   State, LightingState, FanCurvePoint, FanCurveState, TDPState, UndervoltState (exported protocol types)
   client.go                  SocketPath, Send*, Subscribe (all client functions)
   example_test.go            testable examples for all Send* and Subscribe functions
@@ -22,7 +44,8 @@ cmd/                         Cobra subcommands
   root.go                    root command, Version var, dryRunFlag, deviceFlag, noButtonFlag
   apply.go                   apply lighting effect
   brightness.go              set brightness only
-  daemon.go                  start the daemon (z13ctl daemon)
+  daemon.go                  start the daemon (z13ctl-plus daemon)
+  migrate_state.go           explicitly copy validated v1 state into the Plus namespace
   list.go                    list hidraw devices
   off.go                     turn lighting off
   profile.go                 get/set physical performance profile (platform_profile sysfs)
@@ -70,10 +93,12 @@ internal/
                              UeventToDevPath, DeviceNameFromUevent
 contrib/
   systemd/user/
-    z13ctl.socket            systemd user socket unit (socket activation, %t/z13ctl/z13ctl.sock)
-    z13ctl.service           systemd user service unit (Type=notify, Restart=on-failure)
+    z13ctl-plus.socket       systemd user socket unit (socket activation, %t/z13ctl-plus/z13ctl-plus.sock)
+    z13ctl-plus.service      systemd user service unit (Type=notify, Restart=on-failure)
   systemd/system/
-    z13ctl-perms.service     system oneshot unit: chgrp/chmod on battery + firmware-attributes sysfs at boot
+    z13ctl-plus-perms.service system oneshot unit: chgrp/chmod on battery + firmware-attributes sysfs at boot
+  udev/
+    99-z13ctl-plus.rules     persistent HID, input, and sysfs access rules
 ```
 
 ## Key architectural decisions
@@ -95,22 +120,26 @@ contrib/
   allowing other tools to exclusively grab the Armoury Crate button device.
 - **Daemon socket fallback**: CLI commands try the Unix socket first (1 s timeout);
   fall back to direct HID/sysfs if the daemon is not running. Detection is implicit:
-  connection refused → fall back.
-- **Daemon systemd integration**: `z13ctl.socket` uses socket activation (`LISTEN_FDS`).
-  `z13ctl.service` uses `Type=notify` (sd_notify READY=1 after HID open + state restore),
+  connection refused → fall back. Only the Plus socket is checked; an upstream
+  daemon does not suppress direct fallback.
+- **Daemon systemd integration**: `z13ctl-plus.socket` uses socket activation (`LISTEN_FDS`).
+  `z13ctl-plus.service` uses `Type=notify` (sd_notify READY=1 after HID open + state restore),
   `WantedBy=graphical-session.target` (works in both desktop and Steam Gaming Mode).
   Logging goes to journald via stdout/stderr.
-- **State persistence**: `$XDG_STATE_HOME/z13ctl/state.json` (atomic write via temp +
+- **State persistence**: `$XDG_STATE_HOME/z13ctl-plus/state.json` (atomic write via temp +
   rename). `State.Profile` is always the physical profile; fan, TDP, and undervolt
   overrides have independent persisted active flags and are restored independently.
+- **Explicit v1 migration**: `MigrateLegacyState()` reads and validates the legacy
+  `$XDG_STATE_HOME/z13ctl/state.json`, then atomically installs a copy only if
+  Plus state does not exist. It does not remove the legacy file or manage units.
 - **Named presets and power policy**: Presets independently capture profile,
   fan/TDP/undervolt, CPU min/EPP/boost, panel overdrive, and refresh rate. The
   daemon polls external `power_supply` devices and applies assigned AC/battery
   presets only at startup or a real source transition; manual overrides last
   until the next transition. Refresh intent is handled by the shared display
   coordinator rather than issuing independent KScreen writes.
-- **Shared display coordinator**: z13ctl is the sole KScreen writer for the
-  z13ctl + z13-tablet-kit integration. Tablet-kit publishes posture/rotation;
+- **Shared display coordinator**: z13ctl-plus is the sole KScreen writer for the
+  z13ctl-plus + z13-tablet-kit integration. Tablet-kit publishes posture/rotation;
   presets publish refresh intent. The daemon coalesces them into one
   internal-panel transaction, never touches external outputs, waits 10 seconds
   after desktop/dock posture, and skips writes while eDP-1 is disabled.
@@ -318,21 +347,23 @@ sudo make install-perms-service    # install system oneshot service for sysfs pe
 sudo make uninstall-perms-service  # remove system permissions service
 make snapshot           # goreleaser release --snapshot --clean  (no publish)
 make release            # goreleaser release --clean             (requires pushed v* tag)
-make clean              # remove z13ctl binary, dist/, coverage artifacts
+make clean              # remove z13ctl-plus binary, dist/, coverage artifacts
 ```
 
-Version is injected at link time: `-X github.com/dahui/z13ctl/cmd.Version={{.Version}}`.
-Default value in source is `"1.0.0-beta"` (used only in local builds without ldflags).
+Version is injected at link time: `-X github.com/aic0d3r/z13ctl-plus/cmd.Version={{.Version}}`.
+Default value in source is `"2.0.0"` (used only in local builds without ldflags).
 
 ## goreleaser
 
 Config: `.goreleaser.yml`. GitHub Actions workflow: `.github/workflows/release.yml`.
 - Builds for `linux/amd64` only (hidraw is Linux-specific; Z13 is x86_64).
 - `before.hooks`: `go mod tidy` only.
-- Release archives and packages are named `z13ctl-plus`; the binary inside is `z13ctl`.
+- Release archives, packages, and the binary inside are named `z13ctl-plus`.
+- Packages intentionally do not declare upstream provide/conflict/replace
+  relationships and do not enable the Plus user daemon during installation.
 - Archives include `README.md`, `LICENSE`, `contrib/systemd/**/*`, and
   `contrib/udev/*`.
-- `prerelease: auto` — tags with a pre-release suffix (e.g. `v1.0.0-beta`) are marked
+- `prerelease: auto` — tags with a pre-release suffix (e.g. `v2.0.0-beta`) are marked
   as pre-release on GitHub automatically.
 - AUR publishing is manual (`workflow_dispatch`) and requires `AUR_KEY`.
 - To release: `git tag -a vX.Y.Z -F release-notes.md && git push origin vX.Y.Z`.
@@ -351,8 +382,8 @@ Config: `.goreleaser.yml`. GitHub Actions workflow: `.github/workflows/release.y
 The daemon is fully implemented and passing `make build && make test && make lint`.
 
 **Key daemon details:**
-- Socket path: `$XDG_RUNTIME_DIR/z13ctl/z13ctl.sock`
-- State file: `$XDG_STATE_HOME/z13ctl/state.json`
+- Socket path: `$XDG_RUNTIME_DIR/z13ctl-plus/z13ctl-plus.sock`
+- State file: `$XDG_STATE_HOME/z13ctl-plus/state.json`
 - Protocol: one newline-terminated JSON request → one JSON response; long-lived
   connections for `{"cmd":"subscribe","events":["gui-toggle"]}` (GUI use)
 - Button watcher uses `github.com/holoplot/go-evdev`; systemd integration uses
@@ -360,30 +391,31 @@ The daemon is fully implemented and passing `make build && make test && make lin
 - `ATTR{name}=="asus-wmi"` was removed from the platform-profile udev rule because
   platform-profile class devices do not have a `name` sysfs attribute file. The rule
   now matches `SUBSYSTEM=="platform-profile"` alone.
-- `z13ctl-perms.service` (system-level oneshot) runs `chmod g+w` on
+- `z13ctl-plus-perms.service` (system-level oneshot) runs `chmod g+w` on
   `BAT*/charge_control_end_threshold` and firmware-attributes `current_value` files
   after `sysinit.target`. This is necessary because these attributes may be created
   after observable udev events — so no udev `RUN+=` hook can catch them reliably.
 
-**To activate on this machine (must be done once after each `sudo z13ctl setup`):**
+**To activate on this machine (must be done once after each `sudo z13ctl-plus setup`):**
 ```sh
-sudo z13ctl setup                # rewrites rules file; applies sysfs perms immediately
+sudo z13ctl-plus setup           # rewrites rules file; applies sysfs perms immediately
 sudo make install-perms-service  # installs battery sysfs permissions service
 make install-service             # installs daemon socket + service units
 ```
 
-### Phase 2 (GUI) — api/ SUBMODULE COMPLETE, z13gui IN PROGRESS
+### Phase 2 (GUI) — api/ SUBMODULE COMPLETE, z13gui-plus IN PROGRESS
 
 The `api/` submodule (`github.com/dahui/z13ctl/api`) is complete and ready for use
-by the separate z13gui binary. Phase 2a changes:
-- Module path renamed from `z13ctl` to `github.com/dahui/z13ctl`
+by the separate z13gui-plus binary. Phase 2a changes:
+- Root module path is `github.com/aic0d3r/z13ctl-plus`; only the API submodule
+  retains `github.com/dahui/z13ctl/api`
 - `api/` submodule created with `State`, `LightingState` types and all `Send*`, `Subscribe` client functions
 - `internal/daemon/` refactored to use `api.State`/`api.LightingState`
 - `cmd/*.go` updated to call `api.Send*` directly
 - Multi-module dev setup: `go.work` (gitignored) + a retained local `replace`
   directive so the plus binary uses its local API source.
 
-**z13gui** will be a separate repo (`github.com/dahui/z13gui`) using:
+**z13gui-plus** is a separate repo (`github.com/aic0d3r/z13gui-plus`) using:
 - `github.com/diamondburned/gotk4` + `github.com/diamondburned/gotk4-layer-shell`
 - Imports `github.com/dahui/z13ctl/api` for daemon communication
 - Right-edge Wayland overlay drawer (~320px wide), touch-first (48px+ tap targets)
@@ -391,7 +423,8 @@ by the separate z13gui binary. Phase 2a changes:
   brightness/speed sliders, profile list, battery slider
 - Trigger: Armoury Crate button → daemon → `gui-toggle` subscribe event → show/hide drawer
 
-**Fork API release boundary:** Tags in `aic0d3r/z13ctl-plus` do not publish the
-canonical `github.com/dahui/z13ctl/api` module. External API changes must be
-merged and tagged upstream. Plus distribution releases use only annotated
-`vX.Y.Z` tags and retain the local `replace` directive.
+**Fork API release boundary:** Root tags in `aic0d3r/z13ctl-plus` do not publish
+the canonical `github.com/dahui/z13ctl/api` module. Plus clients must use matching
+fork API source through a replacement; upstream API source resolves the upstream
+socket. Plus distribution releases use annotated `vX.Y.Z` tags and retain the
+local root-module `replace` directive.

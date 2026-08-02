@@ -11,8 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 )
 
 const powerPolicyPollInterval = 2 * time.Second

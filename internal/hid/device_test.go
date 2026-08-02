@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dahui/z13ctl/internal/hid"
+	"github.com/aic0d3r/z13ctl-plus/internal/hid"
 )
 
 // pipeDevice returns a write-end-backed Device and the read end of the pipe.

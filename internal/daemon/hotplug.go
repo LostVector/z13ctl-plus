@@ -11,7 +11,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/dahui/z13ctl/internal/hid"
+	"github.com/aic0d3r/z13ctl-plus/internal/hid"
 )
 
 // hotplugPollInterval is how often watchHotplug checks for the keyboard's presence.

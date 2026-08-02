@@ -7,10 +7,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/aura"
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
+	"github.com/aic0d3r/z13ctl-plus/internal/hid"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/aura"
-	"github.com/dahui/z13ctl/internal/cli"
-	"github.com/dahui/z13ctl/internal/hid"
 
 	"github.com/spf13/cobra"
 )

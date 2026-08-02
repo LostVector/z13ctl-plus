@@ -8,8 +8,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
-	"github.com/dahui/z13ctl/internal/cli"
 
 	"github.com/spf13/cobra"
 )
@@ -56,7 +56,7 @@ Profiles:
 			}
 
 			if err := cli.SetProfile(profile); err != nil {
-				return fmt.Errorf("setting platform profile: %w\n  (run 'sudo z13ctl setup' to enable non-root access)", err)
+				return fmt.Errorf("setting platform profile: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
 			}
 			if err := cli.ResetAllFanCurves(); err != nil {
 				return fmt.Errorf("resetting profile fan curve: %w", err)
