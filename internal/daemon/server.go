@@ -14,6 +14,7 @@ import (
 
 	"github.com/aic0d3r/z13ctl-plus/internal/aura"
 	"github.com/aic0d3r/z13ctl-plus/internal/cli"
+	"github.com/aic0d3r/z13ctl-plus/internal/hid"
 	"github.com/dahui/z13ctl/api"
 )
 
@@ -171,6 +172,10 @@ func (d *Daemon) dispatch(req request) response {
 		s.Presets = clonePresetMap(d.state.Presets)
 		s.PowerPolicy = clonePtr(d.state.PowerPolicy)
 		d.mu.Unlock()
+		s.DevicePresence = map[string]bool{
+			"keyboard": hid.HasDevice("keyboard"),
+			"lightbar": hid.HasDevice("lightbar"),
+		}
 		// Populate firmware-managed fields from sysfs (not cached in daemon state).
 		s.BootSound = readIntSysfs(cli.FindBootSoundPath())
 		s.PanelOverdrive = readIntSysfs(cli.FindPanelOverdrivePath())

@@ -12,7 +12,8 @@ const StateSchemaVersion = 1
 type State struct {
 	SchemaVersion      int                      `json:"schema_version,omitempty"`
 	Lighting           LightingState            `json:"lighting"`
-	Devices            map[string]LightingState `json:"devices,omitempty"` // per-device overrides keyed by name
+	Devices            map[string]LightingState `json:"devices,omitempty"`         // per-device overrides keyed by name
+	DevicePresence     map[string]bool          `json:"device_presence,omitempty"` // live HID presence keyed by name
 	Profile            string                   `json:"profile,omitempty"`
 	Battery            int                      `json:"battery_limit,omitempty"`
 	BootSound          int                      `json:"boot_sound,omitempty"`
