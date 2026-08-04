@@ -76,7 +76,7 @@ z13ctl-plus preset policy --enable --ac "Plugged In" --battery "On Battery"
 # Apply a named configuration manually
 z13ctl-plus preset apply "On Battery"
 
-# Coordinate tablet posture and rotation through the daemon
+# Publish tablet posture; rotation is an optional explicit override
 z13ctl-plus display posture tablet
 z13ctl-plus display rotation right
 

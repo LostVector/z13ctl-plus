@@ -136,17 +136,14 @@ func (d *Daemon) reconcileDisplay() (changed, retry bool, err error) {
 	}
 
 	scale := 0.0
-	rotation := "none"
+	rotation := ""
 	switch intent.posture {
-	case "desktop":
+	case "desktop", "laptop":
 		scale = 1.5
-	case "laptop":
-		scale = 1.5
+		rotation = "none"
 	case "tablet":
 		scale = 2
-		if intent.rotation != "" {
-			rotation = intent.rotation
-		}
+		rotation = intent.rotation
 	}
 	refresh := intent.refresh
 	if scale != 0 && math.Abs(current.Scale-scale) < 0.01 {

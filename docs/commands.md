@@ -160,9 +160,9 @@ cannot be deleted until another preset is assigned in its place.
 
 ## display
 
-Publish posture and rotation intent to the daemon's internal-panel coordinator.
-These commands are used by `z13-tablet-kit`; they require the daemon and never
-fall back to direct KScreen writes.
+Publish posture and optional explicit rotation intent to the daemon's
+internal-panel coordinator. `z13-tablet-kit` publishes posture; these commands
+require the daemon and never fall back to direct KScreen writes.
 
 ```sh
 z13ctl-plus display posture desktop
@@ -172,11 +172,11 @@ z13ctl-plus display rotation none
 z13ctl-plus display rotation left
 ```
 
-The coordinator is the sole KScreen writer for z13ctl-plus integrations. Desktop and
-laptop use scale 1.5; tablet uses scale 2.0. It combines refresh, scale, and
-rotation changes into one transaction for `eDP-1`, never changes external
-outputs, waits for dock topology to settle, and skips all writes while the
-internal panel is disabled.
+Desktop and laptop use scale 1.5 and normal rotation; tablet uses scale 2.0 and
+preserves Plasma's current rotation unless an explicit rotation intent was sent.
+The coordinator combines requested refresh, scale, and rotation changes into one
+transaction for `eDP-1`, never changes external outputs, waits for dock topology
+to settle, and skips all writes while the internal panel is disabled.
 
 ---
 

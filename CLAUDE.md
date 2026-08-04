@@ -138,11 +138,11 @@ contrib/
   presets only at startup or a real source transition; manual overrides last
   until the next transition. Refresh intent is handled by the shared display
   coordinator rather than issuing independent KScreen writes.
-- **Shared display coordinator**: z13ctl-plus is the sole KScreen writer for the
-  z13ctl-plus + z13-tablet-kit integration. Tablet-kit publishes posture/rotation;
-  presets publish refresh intent. The daemon coalesces them into one
-  internal-panel transaction, never touches external outputs, waits 10 seconds
-  after desktop/dock posture, and skips writes while eDP-1 is disabled.
+- **Shared display coordinator**: Tablet-kit publishes posture and presets publish
+  refresh intent. Desktop/laptop force normal rotation; tablet preserves Plasma's
+  current rotation unless an explicit rotation intent exists. The daemon coalesces
+  requested internal-panel changes, never touches external outputs, waits 10
+  seconds after desktop/dock posture, and skips writes while eDP-1 is disabled.
 - **Button watcher**: Finds "Asus WMI hotkeys" input device by sysfs name
   (`/sys/class/input/*/device/name`), opens it, grabs it exclusively with EVIOCGRAB,
   and listens for KEY_PROG3 (code 202) key-down events. KEY_PROG3 is the Armoury Crate

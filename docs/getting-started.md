@@ -36,16 +36,17 @@ The daemon preserves a manual selection until the next real AC/battery transitio
 
 ## Display coordination
 
-Publish internal-panel posture and rotation intent to the daemon's KDE display
-coordinator:
+Publish internal-panel posture and, when needed, an explicit rotation override
+to the daemon's KDE display coordinator:
 
 ```sh
 z13ctl-plus display posture tablet
 z13ctl-plus display rotation right
 ```
 
-The coordinator combines scale, rotation, and preset refresh-rate changes without
-modifying external displays.
+The coordinator combines scale and preset refresh-rate changes without modifying
+external displays. Tablet posture preserves Plasma's current rotation unless an
+explicit rotation intent was sent.
 
 ---
 
