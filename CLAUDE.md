@@ -180,7 +180,9 @@ contrib/
   | power policy | `{"cmd":"power-policy-set","enabled":true,"ac_preset":"AC","battery_preset":"Battery"}` | `ok` |
   | display posture | `{"cmd":"display-posture","posture":"tablet"}` | `ok` |
   | display rotation | `{"cmd":"display-rotation","rotation":"left"}` | `ok` |
-  | subscribe | `{"cmd":"subscribe","events":["gui-toggle"]}` | `ok`, then streams events |
+  | tablet settings | `{"cmd":"tablet-settings-set","tablet_settings":{"disable_touchscreen_in_desktop":true,"touchpad_enabled":false,"scroll_sensitivity":3,"scroll_speed":2}}` | `ok` |
+  | tablet status | `{"cmd":"tablet-integration-report","tablet_integration":{"posture":"tablet",...}}` | `ok` |
+  | subscribe | `{"cmd":"subscribe","events":["gui-toggle","state-changed"]}` | `ok`, then streams events |
 - **IPC library**: Hand-rolled JSON. gRPC/drpc require protobuf code generation;
   `net/rpc` lacks streaming; Twirp is HTTP-only. Decky plugin Python backend connects
   via `asyncio.open_unix_connection()` + `json` — zero extra deps.
@@ -189,6 +191,10 @@ contrib/
   used by both `cmd/` and `internal/daemon/server.go` to avoid duplication. Daemon
   GET handlers read sysfs directly (not cached state) for accuracy when another
   process has modified the setting.
+- **Optional tablet companion**: `TabletSettings` persist in daemon state and
+  project mode `0600` to `$XDG_RUNTIME_DIR/z13ctl-plus/tablet-settings.json`.
+  `TabletIntegration` is the latest in-memory heartbeat only. Both updates emit
+  `state-changed`; the daemon never persists a stale heartbeat.
 - **asus-armoury firmware-attributes**: The `asus_armoury` kernel module (mainline
   since Linux 6.19) exposes BIOS attributes via the `fw_attributes_class` interface
   at `/sys/class/firmware-attributes/asus-armoury/attributes/`. On the 2025 Z13,

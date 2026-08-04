@@ -66,6 +66,9 @@ func Run(ctx context.Context, watchBtn bool) error {
 	if err != nil {
 		return fmt.Errorf("load state: %w", err)
 	}
+	if projectErr := projectTabletSettings(d.state.TabletSettings); projectErr != nil {
+		return fmt.Errorf("project tablet settings: %w", projectErr)
+	}
 	if seedErr := d.seedDefaultPresets(fresh); seedErr != nil {
 		return fmt.Errorf("initialize power defaults: %w", seedErr)
 	}

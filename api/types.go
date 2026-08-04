@@ -5,7 +5,7 @@
 package api
 
 // StateSchemaVersion is the current persisted state schema.
-const StateSchemaVersion = 1
+const StateSchemaVersion = 2
 
 // State holds the last-applied settings for all controllable subsystems.
 // It is returned by SendGetState and broadcast as part of daemon responses.
@@ -36,6 +36,28 @@ type State struct {
 	Temperature        int                      `json:"temperature,omitempty"` // APU temp, degrees Celsius (legacy; also in Telemetry)
 	FanRPM             int                      `json:"fan_rpm,omitempty"`     // fan1 speed in RPM (legacy; also in Telemetry)
 	Telemetry          *TelemetryState          `json:"telemetry,omitempty"`   // live sensor readings
+	TabletSettings     TabletSettings           `json:"tablet_settings"`
+	TabletIntegration  *TabletIntegration       `json:"tablet_integration,omitempty"` // live companion status; never persisted
+}
+
+// TabletSettings configures the optional z13-tablet-kit companion.
+type TabletSettings struct {
+	DisableTouchscreenInDesktop bool `json:"disable_touchscreen_in_desktop"`
+	TouchpadEnabled             bool `json:"touchpad_enabled"`
+	ScrollSensitivity           int  `json:"scroll_sensitivity"`
+	ScrollSpeed                 int  `json:"scroll_speed"`
+}
+
+// TabletIntegration is the latest live status reported by z13-tablet-kit.
+type TabletIntegration struct {
+	Posture            string `json:"posture"`
+	FolioPresent       bool   `json:"folio_present"`
+	Healthy            bool   `json:"healthy"`
+	Error              string `json:"error"`
+	LastSeen           int64  `json:"last_seen"`
+	TouchscreenEnabled bool   `json:"touchscreen_enabled"`
+	TouchScrollEnabled bool   `json:"touch_scroll_enabled"`
+	TouchpadEnabled    bool   `json:"touchpad_enabled"`
 }
 
 // TelemetryState captures live sensor readings from the AMD Strix Halo SoC.

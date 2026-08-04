@@ -20,36 +20,47 @@ import (
 	"time"
 )
 
-// SocketPath returns the runtime path for the daemon's Unix socket.
-func SocketPath() string {
+func runtimePath(name string) string {
 	runtime := os.Getenv("XDG_RUNTIME_DIR")
 	if runtime == "" {
 		runtime = "/tmp"
 	}
-	return runtime + "/z13ctl-plus/z13ctl-plus.sock"
+	return runtime + "/z13ctl-plus/" + name
+}
+
+// SocketPath returns the runtime path for the daemon's Unix socket.
+func SocketPath() string {
+	return runtimePath("z13ctl-plus.sock")
+}
+
+// TabletSettingsPath returns the runtime path projected for z13-tablet-kit.
+func TabletSettingsPath() string {
+	return runtimePath("tablet-settings.json")
 }
 
 // request is a command sent to the daemon over the socket.
 type request struct {
-	Cmd        string   `json:"cmd"`
-	Mode       string   `json:"mode,omitempty"`
-	Color      string   `json:"color,omitempty"`  // "RRGGBB" hex
-	Color2     string   `json:"color2,omitempty"` // "RRGGBB" hex
-	Speed      string   `json:"speed,omitempty"`
-	Brightness int      `json:"brightness,omitempty"`
-	Set        string   `json:"set,omitempty"`
-	Device     string   `json:"device,omitempty"` // "keyboard", "lightbar", /dev/hidrawN; empty = all
-	Events     []string `json:"events,omitempty"`
-	PL1        string   `json:"pl1,omitempty"`
-	PL2        string   `json:"pl2,omitempty"`
-	PL3        string   `json:"pl3,omitempty"`
-	Force      bool     `json:"force,omitempty"`
-	Name       string   `json:"name,omitempty"`
-	Enabled    *bool    `json:"enabled,omitempty"`
-	ACPreset   string   `json:"ac_preset,omitempty"`
-	BatPreset  string   `json:"battery_preset,omitempty"`
-	Posture    string   `json:"posture,omitempty"`
-	Rotation   string   `json:"rotation,omitempty"`
+	Cmd               string             `json:"cmd"`
+	Mode              string             `json:"mode,omitempty"`
+	Color             string             `json:"color,omitempty"`  // "RRGGBB" hex
+	Color2            string             `json:"color2,omitempty"` // "RRGGBB" hex
+	Speed             string             `json:"speed,omitempty"`
+	Brightness        int                `json:"brightness,omitempty"`
+	Set               string             `json:"set,omitempty"`
+	Device            string             `json:"device,omitempty"` // "keyboard", "lightbar", /dev/hidrawN; empty = all
+	Events            []string           `json:"events,omitempty"`
+	PL1               string             `json:"pl1,omitempty"`
+	PL2               string             `json:"pl2,omitempty"`
+	PL3               string             `json:"pl3,omitempty"`
+	Force             bool               `json:"force,omitempty"`
+	Name              string             `json:"name,omitempty"`
+	Enabled           *bool              `json:"enabled,omitempty"`
+	ACPreset          string             `json:"ac_preset,omitempty"`
+	BatPreset         string             `json:"battery_preset,omitempty"`
+	Posture           string             `json:"posture,omitempty"`
+	Rotation          string             `json:"rotation,omitempty"`
+	TabletSettings    *TabletSettings    `json:"tablet_settings,omitempty"`
+	TabletIntegration *TabletIntegration `json:"tablet_integration,omitempty"`
 }
 
 // response is the reply to a command or a streamed event notification.
@@ -331,6 +342,16 @@ func SendDisplayPosture(posture string) (bool, error) {
 // display coordinator.
 func SendDisplayRotation(rotation string) (bool, error) {
 	return sendRequest(request{Cmd: "display-rotation", Rotation: rotation})
+}
+
+// SendTabletSettingsSet atomically replaces all persisted tablet settings.
+func SendTabletSettingsSet(settings TabletSettings) (bool, error) {
+	return sendRequest(request{Cmd: "tablet-settings-set", TabletSettings: &settings})
+}
+
+// SendTabletIntegrationReport publishes ephemeral z13-tablet-kit status.
+func SendTabletIntegrationReport(status TabletIntegration) (bool, error) {
+	return sendRequest(request{Cmd: "tablet-integration-report", TabletIntegration: &status})
 }
 
 // SendGetState fetches the daemon's full cached state for GUI initialization.

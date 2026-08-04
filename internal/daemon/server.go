@@ -27,25 +27,27 @@ import (
 // request is a command sent by a client over the socket.
 // One JSON object per newline-terminated message.
 type request struct {
-	Cmd        string   `json:"cmd"`
-	Mode       string   `json:"mode,omitempty"`
-	Color      string   `json:"color,omitempty"`  // "RRGGBB" hex
-	Color2     string   `json:"color2,omitempty"` // "RRGGBB" hex
-	Speed      string   `json:"speed,omitempty"`
-	Brightness int      `json:"brightness,omitempty"`
-	Set        string   `json:"set,omitempty"`
-	Device     string   `json:"device,omitempty"` // "keyboard", "lightbar", /dev/hidrawN; empty = all
-	Events     []string `json:"events,omitempty"`
-	PL1        string   `json:"pl1,omitempty"`
-	PL2        string   `json:"pl2,omitempty"`
-	PL3        string   `json:"pl3,omitempty"`
-	Force      bool     `json:"force,omitempty"`
-	Name       string   `json:"name,omitempty"`
-	Enabled    *bool    `json:"enabled,omitempty"`
-	ACPreset   string   `json:"ac_preset,omitempty"`
-	BatPreset  string   `json:"battery_preset,omitempty"`
-	Posture    string   `json:"posture,omitempty"`
-	Rotation   string   `json:"rotation,omitempty"`
+	Cmd               string                 `json:"cmd"`
+	Mode              string                 `json:"mode,omitempty"`
+	Color             string                 `json:"color,omitempty"`  // "RRGGBB" hex
+	Color2            string                 `json:"color2,omitempty"` // "RRGGBB" hex
+	Speed             string                 `json:"speed,omitempty"`
+	Brightness        int                    `json:"brightness,omitempty"`
+	Set               string                 `json:"set,omitempty"`
+	Device            string                 `json:"device,omitempty"` // "keyboard", "lightbar", /dev/hidrawN; empty = all
+	Events            []string               `json:"events,omitempty"`
+	PL1               string                 `json:"pl1,omitempty"`
+	PL2               string                 `json:"pl2,omitempty"`
+	PL3               string                 `json:"pl3,omitempty"`
+	Force             bool                   `json:"force,omitempty"`
+	Name              string                 `json:"name,omitempty"`
+	Enabled           *bool                  `json:"enabled,omitempty"`
+	ACPreset          string                 `json:"ac_preset,omitempty"`
+	BatPreset         string                 `json:"battery_preset,omitempty"`
+	Posture           string                 `json:"posture,omitempty"`
+	Rotation          string                 `json:"rotation,omitempty"`
+	TabletSettings    *api.TabletSettings    `json:"tablet_settings,omitempty"`
+	TabletIntegration *api.TabletIntegration `json:"tablet_integration,omitempty"`
 }
 
 // response is the reply to a command or a streamed event notification.
@@ -163,6 +165,10 @@ func (d *Daemon) dispatch(req request) response {
 		return responseFromError(d.setDisplayPosture(req.Posture))
 	case "display-rotation":
 		return responseFromError(d.setDisplayRotation(req.Rotation))
+	case "tablet-settings-set":
+		return d.handleTabletSettings(req)
+	case "tablet-integration-report":
+		return d.handleTabletIntegration(req)
 	case "get-state":
 		d.mu.Lock()
 		s := d.state
@@ -171,6 +177,7 @@ func (d *Daemon) dispatch(req request) response {
 		s.Undervolt = clonePtr(d.state.Undervolt)
 		s.Presets = clonePresetMap(d.state.Presets)
 		s.PowerPolicy = clonePtr(d.state.PowerPolicy)
+		s.TabletIntegration = clonePtr(d.state.TabletIntegration)
 		d.mu.Unlock()
 		s.DevicePresence = map[string]bool{
 			"keyboard": hid.HasDevice("keyboard"),
@@ -224,6 +231,70 @@ func (d *Daemon) dispatch(req request) response {
 	default:
 		return response{OK: false, Error: "unknown command: " + req.Cmd}
 	}
+}
+
+func validateTabletSettings(settings api.TabletSettings) error {
+	if settings.ScrollSensitivity < 1 || settings.ScrollSensitivity > 5 {
+		return fmt.Errorf("scroll sensitivity must be between 1 and 5")
+	}
+	if settings.ScrollSpeed < 1 || settings.ScrollSpeed > 5 {
+		return fmt.Errorf("scroll speed must be between 1 and 5")
+	}
+	return nil
+}
+
+func validateTabletIntegration(status api.TabletIntegration) error {
+	switch status.Posture {
+	case "desktop", "laptop", "tablet":
+		return nil
+	default:
+		return fmt.Errorf("posture must be desktop, laptop, or tablet")
+	}
+}
+
+func (d *Daemon) handleTabletSettings(req request) response {
+	if req.TabletSettings == nil {
+		return response{OK: false, Error: "tablet settings are required"}
+	}
+	settings := *req.TabletSettings
+	if err := validateTabletSettings(settings); err != nil {
+		return responseFromError(err)
+	}
+
+	d.mu.Lock()
+	next := d.state
+	next.TabletSettings = settings
+	previous := d.state.TabletSettings
+	if err := projectTabletSettings(settings); err != nil {
+		d.mu.Unlock()
+		return response{OK: false, Error: "project tablet settings: " + err.Error()}
+	}
+	if err := saveState(next); err != nil {
+		_ = projectTabletSettings(previous)
+		d.mu.Unlock()
+		return response{OK: false, Error: "save tablet settings: " + err.Error()}
+	}
+	d.state.TabletSettings = settings
+	d.mu.Unlock()
+
+	d.broadcast(response{Event: "state-changed"})
+	return response{OK: true}
+}
+
+func (d *Daemon) handleTabletIntegration(req request) response {
+	if req.TabletIntegration == nil {
+		return response{OK: false, Error: "tablet integration status is required"}
+	}
+	status := *req.TabletIntegration
+	if err := validateTabletIntegration(status); err != nil {
+		return responseFromError(err)
+	}
+
+	d.mu.Lock()
+	d.state.TabletIntegration = &status
+	d.mu.Unlock()
+	d.broadcast(response{Event: "state-changed"})
+	return response{OK: true}
 }
 
 func responseFromError(err error) response {

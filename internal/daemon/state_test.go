@@ -3,8 +3,10 @@ package daemon
 // state_test.go — Tests for state persistence: saveState, loadState, defaultState.
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/dahui/z13ctl/api"
@@ -46,6 +48,39 @@ func TestSaveAndLoadState_RoundTrip(t *testing.T) {
 	}
 	if got.Devices != nil {
 		t.Errorf("Devices should be nil for all-device state, got %v", got.Devices)
+	}
+}
+
+func TestTabletIntegrationIsNotPersisted(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	settings := api.TabletSettings{
+		DisableTouchscreenInDesktop: false,
+		TouchpadEnabled:             true,
+		ScrollSensitivity:           5,
+		ScrollSpeed:                 4,
+	}
+	status := &api.TabletIntegration{Posture: "tablet", Healthy: true, LastSeen: 1234}
+	if err := saveState(api.State{
+		SchemaVersion:     api.StateSchemaVersion,
+		Profile:           "balanced",
+		TabletSettings:    settings,
+		TabletIntegration: status,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(StatePath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(data), "tablet_integration") {
+		t.Fatalf("persisted live tablet status: %s", data)
+	}
+	got, _, err := loadState()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.TabletSettings != settings || got.TabletIntegration != nil {
+		t.Fatalf("loaded tablet state = settings %+v integration %+v", got.TabletSettings, got.TabletIntegration)
 	}
 }
 
@@ -106,6 +141,49 @@ func TestLoadState_MissingFile(t *testing.T) {
 	def := defaultState()
 	if got.Lighting != def.Lighting {
 		t.Errorf("missing file: got Lighting %+v, want default %+v", got.Lighting, def.Lighting)
+	}
+}
+
+func TestDefaultTabletSettings(t *testing.T) {
+	want := api.TabletSettings{
+		DisableTouchscreenInDesktop: true,
+		TouchpadEnabled:             false,
+		ScrollSensitivity:           3,
+		ScrollSpeed:                 2,
+	}
+	if got := defaultState().TabletSettings; got != want {
+		t.Fatalf("tablet defaults = %+v, want %+v", got, want)
+	}
+}
+
+func TestProjectTabletSettings(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
+	settings := api.TabletSettings{
+		DisableTouchscreenInDesktop: true,
+		TouchpadEnabled:             true,
+		ScrollSensitivity:           4,
+		ScrollSpeed:                 5,
+	}
+	if err := projectTabletSettings(settings); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(api.TabletSettingsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := info.Mode().Perm(); got != 0o600 {
+		t.Fatalf("projection mode = %o, want 600", got)
+	}
+	data, err := os.ReadFile(api.TabletSettingsPath())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var got api.TabletSettings
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatal(err)
+	}
+	if got != settings {
+		t.Fatalf("projected settings = %+v, want %+v", got, settings)
 	}
 }
 
@@ -182,6 +260,28 @@ func TestMigrateLegacyCustomState(t *testing.T) {
 	}
 	if got := s.Presets["Physical"]; got.TDP != nil {
 		t.Fatalf("physical preset retained dormant tuning: %+v", got)
+	}
+}
+
+func TestMigrateSchemaOneAddsTabletDefaultsWithoutChangingTuning(t *testing.T) {
+	fan := &api.FanCurveState{Mode: 1}
+	tdp := &api.TDPState{PL1SPL: 60}
+	s := api.State{
+		SchemaVersion:  1,
+		Profile:        "performance",
+		FanCurve:       fan,
+		TDP:            tdp,
+		FanCurveActive: true,
+		TDPActive:      true,
+	}
+	if !migrateState(&s, "balanced") {
+		t.Fatal("schema one state was not migrated")
+	}
+	if s.FanCurve != fan || s.TDP != tdp || !s.FanCurveActive || !s.TDPActive {
+		t.Fatalf("tablet migration changed tuning: %+v", s)
+	}
+	if s.TabletSettings != defaultTabletSettings() || s.SchemaVersion != api.StateSchemaVersion {
+		t.Fatalf("tablet migration = schema %d settings %+v", s.SchemaVersion, s.TabletSettings)
 	}
 }
 

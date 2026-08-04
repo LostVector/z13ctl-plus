@@ -17,10 +17,20 @@ import (
 
 var stateSaveMu sync.Mutex
 
+func defaultTabletSettings() api.TabletSettings {
+	return api.TabletSettings{
+		DisableTouchscreenInDesktop: true,
+		TouchpadEnabled:             false,
+		ScrollSensitivity:           3,
+		ScrollSpeed:                 2,
+	}
+}
+
 func defaultState() api.State {
 	return api.State{
-		SchemaVersion: api.StateSchemaVersion,
-		Profile:       "balanced",
+		SchemaVersion:  api.StateSchemaVersion,
+		Profile:        "balanced",
+		TabletSettings: defaultTabletSettings(),
 		Lighting: api.LightingState{
 			Enabled:    true,
 			Mode:       "static",
@@ -109,6 +119,7 @@ func loadState() (api.State, bool, error) {
 	if s.SchemaVersion > api.StateSchemaVersion {
 		return api.State{}, false, fmt.Errorf("state schema %d is newer than supported schema %d", s.SchemaVersion, api.StateSchemaVersion)
 	}
+	s.TabletIntegration = nil
 	changed := migrateState(&s, readProfileFromSysfs())
 	if !isPhysicalProfile(s.Profile) {
 		s.Profile = "balanced"
@@ -121,54 +132,59 @@ func loadState() (api.State, bool, error) {
 }
 
 func migrateState(s *api.State, physicalProfile string) bool {
-	if s.SchemaVersion >= api.StateSchemaVersion {
-		return false
-	}
-
-	legacyCustom := s.Profile == "custom"
-	if legacyCustom {
-		if !isPhysicalProfile(physicalProfile) {
-			physicalProfile = "balanced"
-		}
-		s.Profile = physicalProfile
-		s.FanCurveActive = s.FanCurve != nil
-		s.TDPActive = s.TDP != nil
-		s.UndervoltActive = s.Undervolt != nil
-	} else {
-		if !isPhysicalProfile(s.Profile) {
-			s.Profile = "balanced"
-		}
-		s.FanCurve = nil
-		s.TDP = nil
-		s.Undervolt = nil
-	}
-	if s.Undervolt != nil {
-		s.Undervolt.Active = s.UndervoltActive
-	}
-
-	for name, preset := range s.Presets {
-		switch {
-		case preset.Profile == "custom":
-			preset.Profile = preset.BaseProfile
-			if !isPhysicalProfile(preset.Profile) {
-				preset.Profile = "balanced"
+	changed := false
+	if s.SchemaVersion < 1 {
+		legacyCustom := s.Profile == "custom"
+		if legacyCustom {
+			if !isPhysicalProfile(physicalProfile) {
+				physicalProfile = "balanced"
 			}
-		case isPhysicalProfile(preset.Profile):
-			preset.FanCurve = nil
-			preset.TDP = nil
-			preset.Undervolt = nil
-		default:
-			preset.Profile = "balanced"
-			preset.FanCurve = nil
-			preset.TDP = nil
-			preset.Undervolt = nil
+			s.Profile = physicalProfile
+			s.FanCurveActive = s.FanCurve != nil
+			s.TDPActive = s.TDP != nil
+			s.UndervoltActive = s.Undervolt != nil
+		} else {
+			if !isPhysicalProfile(s.Profile) {
+				s.Profile = "balanced"
+			}
+			s.FanCurve = nil
+			s.TDP = nil
+			s.Undervolt = nil
 		}
-		preset.BaseProfile = ""
-		s.Presets[name] = preset
-	}
+		if s.Undervolt != nil {
+			s.Undervolt.Active = s.UndervoltActive
+		}
 
-	s.SchemaVersion = api.StateSchemaVersion
-	return true
+		for name, preset := range s.Presets {
+			switch {
+			case preset.Profile == "custom":
+				preset.Profile = preset.BaseProfile
+				if !isPhysicalProfile(preset.Profile) {
+					preset.Profile = "balanced"
+				}
+			case isPhysicalProfile(preset.Profile):
+				preset.FanCurve = nil
+				preset.TDP = nil
+				preset.Undervolt = nil
+			default:
+				preset.Profile = "balanced"
+				preset.FanCurve = nil
+				preset.TDP = nil
+				preset.Undervolt = nil
+			}
+			preset.BaseProfile = ""
+			s.Presets[name] = preset
+		}
+
+		s.SchemaVersion = 1
+		changed = true
+	}
+	if s.SchemaVersion < 2 {
+		s.TabletSettings = defaultTabletSettings()
+		s.SchemaVersion = 2
+		changed = true
+	}
+	return changed
 }
 
 func isPhysicalProfile(profile string) bool {
@@ -183,6 +199,7 @@ func saveState(s api.State) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
 		return err
 	}
+	s.TabletIntegration = nil
 	data, err := json.MarshalIndent(s, "", "  ")
 	if err != nil {
 		return err
@@ -192,4 +209,28 @@ func saveState(s api.State) error {
 		return err
 	}
 	return os.Rename(tmp, path)
+}
+
+func projectTabletSettings(settings api.TabletSettings) error {
+	path := api.TabletSettingsPath()
+	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+		return err
+	}
+	data, err := json.MarshalIndent(settings, "", "  ")
+	if err != nil {
+		return err
+	}
+	tmp := path + ".tmp"
+	if err := os.WriteFile(tmp, data, 0o600); err != nil {
+		return err
+	}
+	if err := os.Chmod(tmp, 0o600); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	if err := os.Rename(tmp, path); err != nil {
+		_ = os.Remove(tmp)
+		return err
+	}
+	return nil
 }

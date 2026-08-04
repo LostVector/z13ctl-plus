@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func assertCommandSent(t *testing.T, send func() (bool, error), want string) {
+func captureRequest(t *testing.T, send func() (bool, error)) request {
 	t.Helper()
 	runtimeDir := t.TempDir()
 	t.Setenv("XDG_RUNTIME_DIR", runtimeDir)
@@ -38,7 +38,12 @@ func assertCommandSent(t *testing.T, send func() (bool, error), want string) {
 	if err != nil || !handled {
 		t.Fatalf("send() = %t, %v", handled, err)
 	}
-	if got := <-requestCh; got.Cmd != want {
+	return <-requestCh
+}
+
+func assertCommandSent(t *testing.T, send func() (bool, error), want string) {
+	t.Helper()
+	if got := captureRequest(t, send); got.Cmd != want {
 		t.Fatalf("command = %q, want %q", got.Cmd, want)
 	}
 }
@@ -49,6 +54,44 @@ func TestSendRestoreRecommendedProtocol(t *testing.T) {
 
 func TestSendTuningResetProtocol(t *testing.T) {
 	assertCommandSent(t, SendTuningReset, "tuning-reset")
+}
+
+func TestTabletProtocol(t *testing.T) {
+	settings := TabletSettings{
+		DisableTouchscreenInDesktop: true,
+		TouchpadEnabled:             true,
+		ScrollSensitivity:           4,
+		ScrollSpeed:                 5,
+	}
+	got := captureRequest(t, func() (bool, error) { return SendTabletSettingsSet(settings) })
+	if got.Cmd != "tablet-settings-set" || got.TabletSettings == nil || *got.TabletSettings != settings {
+		t.Fatalf("settings request = %+v", got)
+	}
+
+	status := TabletIntegration{
+		Posture:            "tablet",
+		FolioPresent:       false,
+		Healthy:            true,
+		LastSeen:           1234,
+		TouchscreenEnabled: true,
+		TouchScrollEnabled: true,
+	}
+	got = captureRequest(t, func() (bool, error) { return SendTabletIntegrationReport(status) })
+	if got.Cmd != "tablet-integration-report" || got.TabletIntegration == nil || *got.TabletIntegration != status {
+		t.Fatalf("integration request = %+v", got)
+	}
+
+	data, err := json.Marshal(response{OK: true, State: &State{TabletSettings: settings, TabletIntegration: &status}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stateResponse response
+	if err := json.Unmarshal(data, &stateResponse); err != nil {
+		t.Fatal(err)
+	}
+	if stateResponse.State == nil || stateResponse.State.TabletSettings != settings || stateResponse.State.TabletIntegration == nil || *stateResponse.State.TabletIntegration != status {
+		t.Fatalf("state response = %+v", stateResponse.State)
+	}
 }
 
 func TestStateProtocolIncludesTuningFlags(t *testing.T) {
@@ -90,5 +133,13 @@ func TestSocketPath(t *testing.T) {
 				t.Fatalf("SocketPath() = %q, want %q", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestTabletSettingsPath(t *testing.T) {
+	t.Setenv("XDG_RUNTIME_DIR", "/run/user/1000")
+	want := "/run/user/1000/z13ctl-plus/tablet-settings.json"
+	if got := TabletSettingsPath(); got != want {
+		t.Fatalf("TabletSettingsPath() = %q, want %q", got, want)
 	}
 }

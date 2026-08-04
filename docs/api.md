@@ -68,6 +68,9 @@ stream of events.
 path := api.SocketPath()
 // $XDG_RUNTIME_DIR/z13ctl-plus/z13ctl-plus.sock
 // (or /tmp/z13ctl-plus/z13ctl-plus.sock)
+
+settingsPath := api.TabletSettingsPath()
+// $XDG_RUNTIME_DIR/z13ctl-plus/tablet-settings.json
 ```
 
 ---
@@ -128,6 +131,17 @@ handled, err := api.SendPresetApply("Daily")
 handled, err := api.SendPresetDelete("Daily")
 handled, err := api.SendRestoreRecommended()
 handled, err := api.SendPowerPolicySet(true, "Plugged In", "On Battery")
+
+// Optional tablet companion settings and live heartbeat
+handled, err := api.SendTabletSettingsSet(api.TabletSettings{
+    DisableTouchscreenInDesktop: true,
+    TouchpadEnabled:             false,
+    ScrollSensitivity:           3,
+    ScrollSpeed:                 2,
+})
+handled, err := api.SendTabletIntegrationReport(api.TabletIntegration{
+    Posture: "tablet", Healthy: true, LastSeen: time.Now().Unix(),
+})
 ```
 
 **Full state snapshot (for GUI initialization):**
@@ -149,19 +163,22 @@ if handled && err == nil {
     fmt.Println("CPU power:", state.CPUPower)
     fmt.Println("APU temp:", state.Temperature, "°C")
     fmt.Println("fan RPM:", state.FanRPM)
+    fmt.Println("tablet settings:", state.TabletSettings)
+    fmt.Println("tablet integration:", state.TabletIntegration) // latest live report, if any
 }
 ```
 
-**Subscribe to Armoury Crate button events:**
+**Subscribe to daemon events:**
 
 ```go
-ch, cancel, err := api.Subscribe([]string{"gui-toggle"})
+ch, cancel, err := api.Subscribe([]string{"gui-toggle", "state-changed"})
 if ch == nil {
     // daemon not running
 }
 defer cancel()
 for event := range ch {
     fmt.Println("received:", event)
+    // Fetch state again when event == "state-changed".
 }
 ```
 

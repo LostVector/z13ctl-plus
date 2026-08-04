@@ -180,6 +180,42 @@ to settle, and skips all writes while the internal panel is disabled.
 
 ---
 
+## tablet
+
+Configure and report the optional `z13-tablet-kit` companion through the daemon:
+
+```sh
+# Inspect the authoritative settings as JSON.
+z13ctl-plus tablet settings
+
+# Replace all settings atomically (all four flags are required).
+z13ctl-plus tablet settings set \
+  --disable-touchscreen-in-desktop=true \
+  --touchpad-enabled=false \
+  --scroll-sensitivity=3 \
+  --scroll-speed=2
+
+# Publish one live status/heartbeat (all eight flags are required).
+z13ctl-plus tablet report \
+  --posture=tablet \
+  --folio-present=false \
+  --healthy=true \
+  --error="" \
+  --last-seen=1785800000 \
+  --touchscreen-enabled=true \
+  --touch-scroll-enabled=true \
+  --touchpad-enabled=false
+```
+
+Posture must be `desktop`, `laptop`, or `tablet`; both scroll levels must be
+1-5. `last-seen` is a Unix timestamp in seconds. These commands require the
+daemon and return nonzero if it cannot be reached or rejects the report.
+
+Defaults are touchscreen disabled in desktop posture, touchpad disabled,
+scroll sensitivity 3 (the kit's current step 90), and scroll speed 2.
+
+---
+
 ## batterylimit
 
 Get or set the battery charge limit via the Linux ACPI `power_supply` sysfs

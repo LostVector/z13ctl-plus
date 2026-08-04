@@ -141,12 +141,27 @@ every successful command. It stores:
 - `presets` — named performance/display snapshots
 - `power_policy` — automatic AC and battery preset assignments
 - `active_preset` — the last fully applied preset
+- `tablet_settings` — authoritative settings for the optional tablet companion
 
 On `get-state` requests the daemon also populates `temperature` (APU die
 temperature in °C), `fan_rpm` (fan speed in RPM), `cpu_power` (live cpufreq
 minimum, EPP, boost, and available limits), and `undervolt_available`
 (whether the `ryzen_smu` kernel module is present) from live sysfs reads.
 These are not persisted — they are real-time sensor values.
+
+The latest `tablet_integration` heartbeat is likewise live-only and is empty
+after a daemon restart. Tablet settings are also projected atomically with mode
+`0600` to `$XDG_RUNTIME_DIR/z13ctl-plus/tablet-settings.json` (or the `/tmp`
+fallback used by the socket) for read-only use by `z13-tablet-kit`:
+
+```json
+{
+  "disable_touchscreen_in_desktop": true,
+  "touchpad_enabled": false,
+  "scroll_sensitivity": 3,
+  "scroll_speed": 2
+}
+```
 
 On startup the daemon reads this file and independently restores each active fan
 curve, TDP, and undervolt override before accepting connections.
