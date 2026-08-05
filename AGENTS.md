@@ -412,28 +412,38 @@ sudo make install-perms-service  # installs battery sysfs permissions service
 make install-service             # installs daemon socket + service units
 ```
 
-### Phase 2 (GUI) — api/ SUBMODULE COMPLETE, z13gui-plus IN PROGRESS
+### Phase 2 (GUI) — COMPLETE
 
-The `api/` submodule (`github.com/dahui/z13ctl/api`) is complete and ready for use
-by the separate z13gui-plus binary. Phase 2a changes:
-- Root module path is `github.com/aic0d3r/z13ctl-plus`; only the API submodule
-  retains `github.com/dahui/z13ctl/api`
-- `api/` submodule created with `State`, `LightingState` types and all `Send*`, `Subscribe` client functions
-- `internal/daemon/` refactored to use `api.State`/`api.LightingState`
-- `cmd/*.go` updated to call `api.Send*` directly
-- Multi-module dev setup: `go.work` (gitignored) + a retained local `replace`
-  directive so the plus binary uses its local API source.
+The `z13gui-plus` overlay and the `api/` submodule are complete and released.
+- Root module is `github.com/aic0d3r/z13ctl-plus`; only the API submodule retains
+  `github.com/dahui/z13ctl/api`, selected by Plus clients through a replacement.
+- `z13gui-plus` (repo `aic0d3r/z13gui-plus`) is a GTK4 Wayland/Gamescope overlay
+  drawer talking to the daemon through `api/`.
+- Current release: **v2.1.0** (main) and **api/v1.5.0** (submodule).
 
-**z13gui-plus** is a separate repo (`github.com/aic0d3r/z13gui-plus`) using:
-- `github.com/diamondburned/gotk4` + `github.com/diamondburned/gotk4-layer-shell`
-- Imports `github.com/dahui/z13ctl/api` for daemon communication
-- Right-edge Wayland overlay drawer (~320px wide), touch-first (48px+ tap targets)
-- Per-device tabs (Keyboard / Lightbar), mode grid, color swatches + custom picker,
-  brightness/speed sliders, profile list, battery slider
-- Trigger: Armoury Crate button → daemon → `gui-toggle` subscribe event → show/hide drawer
+**Fork API release boundary:** Root `vX.Y.Z` tags in `aic0d3r/z13ctl-plus` do not
+publish the canonical `github.com/dahui/z13ctl/api` module. Plus clients select
+matching fork API source via a replacement; the API submodule is tagged separately
+as `api/vX.Y.Z` (e.g. `api/v1.5.0`). Standalone builds of `z13gui-plus` resolve
+`github.com/aic0d3r/z13ctl-plus/api` from the published `api/v*` tag.
 
-**Fork API release boundary:** Root tags in `aic0d3r/z13ctl-plus` do not publish
-the canonical `github.com/dahui/z13ctl/api` module. Plus clients must use matching
-fork API source through a replacement; upstream API source resolves the upstream
-socket. Plus distribution releases use annotated `vX.Y.Z` tags and retain the
-local root-module `replace` directive.
+### Phase 3 (tablet integration) — COMPLETE
+
+`z13ctl-plus` is the display and tablet-settings authority in a three-repo stack:
+- **z13-tablet-kit** (`aic0d3r/z13-tablet-kit`): posture detection (dock/folio/tablet),
+  touchscreen toggle, virtual `SW_TABLET_MODE`, touch scroll + two-finger-hold context
+  menu, OSK posture gating.
+- **z13ctl-plus** (this repo): owns internal-panel scale/rotation/refresh and persists
+  tablet settings.
+- **z13gui-plus** (`aic0d3r/z13gui-plus`): overlay drawer exposing live posture/health
+  and the tablet toggles.
+
+Tablet-specific daemon behaviour (all complete):
+- `z13ctl-plus tablet settings` (persist) + `z13ctl-plus tablet report` (ephemeral
+  integration state); settings projected to
+  `$XDG_RUNTIME_DIR/z13ctl-plus/tablet-settings.json` for the kit to read live.
+- Display posture: tablet scale `1.75`; desktop/laptop `1.5`. Plasma retains tablet
+  rotation unless an explicit rotation intent is sent. The kit never calls
+  `kscreen-doctor` directly.
+- Tablet settings: desktop-touch policy, `two_finger_hold_context_menu`, folio
+  touchpad opt-in, scroll sensitivity/speed.
