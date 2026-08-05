@@ -157,11 +157,15 @@ fallback used by the socket) for read-only use by `z13-tablet-kit`:
 ```json
 {
   "disable_touchscreen_in_desktop": true,
+  "two_finger_hold_context_menu": false,
   "touchpad_enabled": false,
   "scroll_sensitivity": 3,
   "scroll_speed": 2
 }
 ```
+
+The opt-in context-menu gesture emits the context-menu key after a quick
+stationary two-finger hold (~650 ms); movement cancels it.
 
 On startup the daemon reads this file and independently restores each active fan
 curve, TDP, and undervolt override before accepting connections.

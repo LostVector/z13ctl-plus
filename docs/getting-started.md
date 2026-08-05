@@ -45,8 +45,8 @@ z13ctl-plus display rotation right
 ```
 
 The coordinator combines scale and preset refresh-rate changes without modifying
-external displays. Tablet posture preserves Plasma's current rotation unless an
-explicit rotation intent was sent.
+external displays. Desktop and laptop use 150% scale; tablet uses 175% and
+preserves Plasma's current rotation unless an explicit rotation intent was sent.
 
 ---
 

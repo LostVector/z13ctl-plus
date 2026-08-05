@@ -139,10 +139,11 @@ contrib/
   until the next transition. Refresh intent is handled by the shared display
   coordinator rather than issuing independent KScreen writes.
 - **Shared display coordinator**: Tablet-kit publishes posture and presets publish
-  refresh intent. Desktop/laptop force normal rotation; tablet preserves Plasma's
-  current rotation unless an explicit rotation intent exists. The daemon coalesces
-  requested internal-panel changes, never touches external outputs, waits 10
-  seconds after desktop/dock posture, and skips writes while eDP-1 is disabled.
+  refresh intent. Desktop/laptop use 150% scale and force normal rotation; tablet
+  uses 175% and preserves Plasma's current rotation unless an explicit rotation
+  intent exists. The daemon coalesces requested internal-panel changes, never
+  touches external outputs, waits 10 seconds after desktop/dock posture, and skips
+  writes while eDP-1 is disabled.
 - **Button watcher**: Finds "Asus WMI hotkeys" input device by sysfs name
   (`/sys/class/input/*/device/name`), opens it, grabs it exclusively with EVIOCGRAB,
   and listens for KEY_PROG3 (code 202) key-down events. KEY_PROG3 is the Armoury Crate
@@ -180,7 +181,7 @@ contrib/
   | power policy | `{"cmd":"power-policy-set","enabled":true,"ac_preset":"AC","battery_preset":"Battery"}` | `ok` |
   | display posture | `{"cmd":"display-posture","posture":"tablet"}` | `ok` |
   | display rotation | `{"cmd":"display-rotation","rotation":"left"}` | `ok` |
-  | tablet settings | `{"cmd":"tablet-settings-set","tablet_settings":{"disable_touchscreen_in_desktop":true,"touchpad_enabled":false,"scroll_sensitivity":3,"scroll_speed":2}}` | `ok` |
+  | tablet settings | `{"cmd":"tablet-settings-set","tablet_settings":{"disable_touchscreen_in_desktop":true,"two_finger_hold_context_menu":false,"touchpad_enabled":false,"scroll_sensitivity":3,"scroll_speed":2}}` | `ok` |
   | tablet status | `{"cmd":"tablet-integration-report","tablet_integration":{"posture":"tablet",...}}` | `ok` |
   | subscribe | `{"cmd":"subscribe","events":["gui-toggle","state-changed"]}` | `ok`, then streams events |
 - **IPC library**: Hand-rolled JSON. gRPC/drpc require protobuf code generation;
@@ -194,7 +195,9 @@ contrib/
 - **Optional tablet companion**: `TabletSettings` persist in daemon state and
   project mode `0600` to `$XDG_RUNTIME_DIR/z13ctl-plus/tablet-settings.json`.
   `TabletIntegration` is the latest in-memory heartbeat only. Both updates emit
-  `state-changed`; the daemon never persists a stale heartbeat.
+  `state-changed`; the daemon never persists a stale heartbeat. The opt-in
+  two-finger context-menu gesture emits the context-menu key after a quick
+  stationary two-finger hold (~650 ms) and is canceled by movement.
 - **asus-armoury firmware-attributes**: The `asus_armoury` kernel module (mainline
   since Linux 6.19) exposes BIOS attributes via the `fw_attributes_class` interface
   at `/sys/class/firmware-attributes/asus-armoury/attributes/`. On the 2025 Z13,

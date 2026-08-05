@@ -43,6 +43,7 @@ type State struct {
 // TabletSettings configures the optional z13-tablet-kit companion.
 type TabletSettings struct {
 	DisableTouchscreenInDesktop bool `json:"disable_touchscreen_in_desktop"`
+	TwoFingerHoldContextMenu    bool `json:"two_finger_hold_context_menu"`
 	TouchpadEnabled             bool `json:"touchpad_enabled"`
 	ScrollSensitivity           int  `json:"scroll_sensitivity"`
 	ScrollSpeed                 int  `json:"scroll_speed"`

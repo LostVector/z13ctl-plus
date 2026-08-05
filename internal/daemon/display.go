@@ -142,7 +142,7 @@ func (d *Daemon) reconcileDisplay() (changed, retry bool, err error) {
 		scale = 1.5
 		rotation = "none"
 	case "tablet":
-		scale = 2
+		scale = 1.75
 		rotation = intent.rotation
 	}
 	refresh := intent.refresh

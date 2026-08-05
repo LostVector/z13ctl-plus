@@ -55,6 +55,7 @@ func TestTabletIntegrationIsNotPersisted(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	settings := api.TabletSettings{
 		DisableTouchscreenInDesktop: false,
+		TwoFingerHoldContextMenu:    true,
 		TouchpadEnabled:             true,
 		ScrollSensitivity:           5,
 		ScrollSpeed:                 4,
@@ -147,6 +148,7 @@ func TestLoadState_MissingFile(t *testing.T) {
 func TestDefaultTabletSettings(t *testing.T) {
 	want := api.TabletSettings{
 		DisableTouchscreenInDesktop: true,
+		TwoFingerHoldContextMenu:    false,
 		TouchpadEnabled:             false,
 		ScrollSensitivity:           3,
 		ScrollSpeed:                 2,
@@ -160,6 +162,7 @@ func TestProjectTabletSettings(t *testing.T) {
 	t.Setenv("XDG_RUNTIME_DIR", t.TempDir())
 	settings := api.TabletSettings{
 		DisableTouchscreenInDesktop: true,
+		TwoFingerHoldContextMenu:    true,
 		TouchpadEnabled:             true,
 		ScrollSensitivity:           4,
 		ScrollSpeed:                 5,

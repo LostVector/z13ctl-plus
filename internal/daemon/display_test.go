@@ -1,6 +1,9 @@
 package daemon
 
 import (
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 )
@@ -37,5 +40,29 @@ func TestDisplayIntentValidation(t *testing.T) {
 	}
 	if err := d.setDisplayRefresh(180); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestReconcileDisplayTabletScalePreservesRotation(t *testing.T) {
+	dir := t.TempDir()
+	argsPath := filepath.Join(dir, "args")
+	script := "#!/bin/sh\nif [ \"$1\" = \"-o\" ]; then\n  printf 'Output: 1 eDP-1 abc\\n\\tenabled\\n\\tModes: 1:2560x1600@180.00*\\n\\tScale: 1.5\\n\\tRotation: 2\\n'\n  exit 0\nfi\nprintf '%s\\n' \"$*\" > \"$Z13CTL_ARGS\"\n"
+	if err := os.WriteFile(filepath.Join(dir, "kscreen-doctor"), []byte(script), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+string(os.PathListSeparator)+os.Getenv("PATH"))
+	t.Setenv("Z13CTL_ARGS", argsPath)
+
+	d := &Daemon{display: displayIntent{posture: "tablet"}}
+	changed, retry, err := d.reconcileDisplay()
+	if err != nil || !changed || retry {
+		t.Fatalf("reconcileDisplay() = changed %t, retry %t, err %v", changed, retry, err)
+	}
+	args, err := os.ReadFile(argsPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := strings.TrimSpace(string(args)), "output.eDP-1.scale.1.75"; got != want {
+		t.Fatalf("kscreen-doctor args = %q, want %q", got, want)
 	}
 }

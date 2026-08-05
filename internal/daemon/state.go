@@ -20,6 +20,7 @@ var stateSaveMu sync.Mutex
 func defaultTabletSettings() api.TabletSettings {
 	return api.TabletSettings{
 		DisableTouchscreenInDesktop: true,
+		TwoFingerHoldContextMenu:    false,
 		TouchpadEnabled:             false,
 		ScrollSensitivity:           3,
 		ScrollSpeed:                 2,

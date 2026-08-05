@@ -10,6 +10,7 @@ import (
 
 var (
 	tabletDisableTouchscreenInDesktop bool
+	tabletTwoFingerHoldContextMenu    bool
 	tabletSettingsTouchpadEnabled     bool
 	tabletScrollSensitivity           int
 	tabletScrollSpeed                 int
@@ -60,6 +61,7 @@ var tabletSettingsSetCmd = &cobra.Command{
 	RunE: func(_ *cobra.Command, _ []string) error {
 		settings := api.TabletSettings{
 			DisableTouchscreenInDesktop: tabletDisableTouchscreenInDesktop,
+			TwoFingerHoldContextMenu:    tabletTwoFingerHoldContextMenu,
 			TouchpadEnabled:             tabletSettingsTouchpadEnabled,
 			ScrollSensitivity:           tabletScrollSensitivity,
 			ScrollSpeed:                 tabletScrollSpeed,
@@ -103,10 +105,11 @@ var tabletReportCmd = &cobra.Command{
 
 func init() {
 	tabletSettingsSetCmd.Flags().BoolVar(&tabletDisableTouchscreenInDesktop, "disable-touchscreen-in-desktop", true, "Disable touchscreen in desktop posture")
+	tabletSettingsSetCmd.Flags().BoolVar(&tabletTwoFingerHoldContextMenu, "two-finger-hold-context-menu", false, "Emit the context-menu key on a stationary two-finger hold")
 	tabletSettingsSetCmd.Flags().BoolVar(&tabletSettingsTouchpadEnabled, "touchpad-enabled", false, "Enable the folio touchpad")
 	tabletSettingsSetCmd.Flags().IntVar(&tabletScrollSensitivity, "scroll-sensitivity", 3, "Touch scroll sensitivity level (1-5)")
 	tabletSettingsSetCmd.Flags().IntVar(&tabletScrollSpeed, "scroll-speed", 2, "Touch scroll speed level (1-5)")
-	for _, name := range []string{"disable-touchscreen-in-desktop", "touchpad-enabled", "scroll-sensitivity", "scroll-speed"} {
+	for _, name := range []string{"disable-touchscreen-in-desktop", "two-finger-hold-context-menu", "touchpad-enabled", "scroll-sensitivity", "scroll-speed"} {
 		_ = tabletSettingsSetCmd.MarkFlagRequired(name)
 	}
 
