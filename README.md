@@ -37,6 +37,25 @@ upstream API source targets the upstream socket.
 > CPU policy, expanded telemetry, refresh rate, and tuning controls through the
 > daemon. Display posture/rotation and scripting remain CLI/API workflows.
 
+## Tablet stack
+
+`z13ctl-plus` is the display and settings authority in a three-repo tablet
+stack for the Z13. Install the other two repos alongside it:
+
+- [z13-tablet-kit](https://github.com/aic0d3r/z13-tablet-kit) — detects
+  dock/folio/tablet posture, toggles the touchscreen, and provides touch
+  scrolling and two-finger context menus
+- **z13ctl-plus** (this repo) — owns internal-panel scale/rotation/refresh
+  changes and persists tablet settings (desktop touch policy, two-finger hold,
+  folio touchpad opt-in, scroll speed)
+- [z13gui-plus](https://github.com/aic0d3r/z13gui-plus) — GTK4 overlay drawer
+  exposing live posture/health and the tablet toggles
+
+Flow: the kit detects posture and publishes it to this daemon, which applies
+the display changes; the GUI shows state and persists settings back through the
+daemon; the daemon projects them to a runtime settings file the kit reads and
+applies live.
+
 ## Install
 
 ```sh
