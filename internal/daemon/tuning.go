@@ -28,13 +28,27 @@ type tuningPlan struct {
 	FanSafety bool
 }
 
+// curveMeetsHighTDPFloor reports whether every point of the curve is at or
+// above cli.HighTDPMinPWM, so it cools at least as well as the safety curve.
+func curveMeetsHighTDPFloor(points []api.FanCurvePoint) bool {
+	for _, p := range points {
+		if p.PWM < cli.HighTDPMinPWM {
+			return false
+		}
+	}
+	return len(points) > 0
+}
+
 func planTuning(state api.State) tuningPlan {
 	plan := tuningPlan{}
 	if state.TDPActive && state.TDP != nil {
 		plan.TDP = clonePtr(state.TDP)
 		plan.FanSafety = state.TDP.PL1SPL > cli.TDPMaxSafe
 	}
-	if plan.FanSafety {
+	userCurveMeetsFloor := state.FanCurveActive && state.FanCurve != nil && curveMeetsHighTDPFloor(state.FanCurve.Points)
+	if plan.FanSafety && !userCurveMeetsFloor {
+		// High sustained TDP: enforce the safety floor. A user curve whose
+		// every PWM is already at or above the floor is stronger and stands.
 		plan.Fan = &api.FanCurveState{Mode: 1, Points: cli.HighTDPFanCurve()}
 	} else if state.FanCurveActive && state.FanCurve != nil {
 		plan.Fan = cloneFanCurve(state.FanCurve)
@@ -93,7 +107,6 @@ func (d *Daemon) commitTuningState(next api.State, activePreset string) error {
 		d.state.Undervolt.Active = next.UndervoltActive
 	}
 	d.state.ActivePreset = activePreset
-	s := d.state
 	d.mu.Unlock()
-	return saveState(s)
+	return d.persistState()
 }

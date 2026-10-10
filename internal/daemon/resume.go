@@ -86,6 +86,10 @@ func (d *Daemon) handlePrepareForSleep(sig *dbus.Signal) {
 	}
 	if sleeping {
 		slog.Info("system entering sleep")
+		// Hold d.mu across the device use: the hotplug watcher may otherwise
+		// swap (and close) d.dev mid-write.
+		d.mu.Lock()
+		defer d.mu.Unlock()
 		if d.dev != nil {
 			if err := aura.TurnOff(d.dev); err != nil {
 				slog.Warn("failed to turn off lighting before sleep", "err", err)
@@ -123,24 +127,12 @@ func (d *Daemon) restoreVolatileState() {
 	d.mu.Unlock()
 	defer d.requestDisplayReconcile()
 
-	if state.ActivePreset == "" {
-		d.applyMu.Lock()
-		defer d.applyMu.Unlock()
-	} else {
-		d.applyMu.Lock()
-	}
-
-	// Restore lighting (lost on sleep regardless of profile).
-	if d.dev != nil {
-		if err := d.applyLightingState(); err != nil {
-			slog.Warn("resume: failed to restore lighting", "err", err)
-		} else {
-			slog.Info("resume: lighting restored")
-		}
-	}
+	// Restore lighting (lost on sleep regardless of profile). restoreLighting
+	// takes applyMu then d.mu around the device use, matching the dispatch
+	// handlers' lock order.
+	d.restoreLighting()
 
 	if state.ActivePreset != "" {
-		d.applyMu.Unlock()
 		if err := d.applyPreset(state.ActivePreset); err != nil {
 			slog.Warn("resume: failed to restore active preset", "preset", state.ActivePreset, "err", err)
 		} else {
@@ -149,6 +141,8 @@ func (d *Daemon) restoreVolatileState() {
 		return
 	}
 
+	d.applyMu.Lock()
+	defer d.applyMu.Unlock()
 	if err := applyTuning(state, false); err != nil {
 		slog.Warn("resume: failed to restore tuning", "err", err)
 	} else {
@@ -163,6 +157,10 @@ func (d *Daemon) restoreLighting() {
 	d.applyMu.Lock()
 	defer d.applyMu.Unlock()
 	defer d.requestDisplayReconcile()
+	// d.mu guards d.dev against the hotplug reopen; applyLightingState must
+	// not take d.mu itself (reopenAndRestore calls it with d.mu held).
+	d.mu.Lock()
+	defer d.mu.Unlock()
 	if d.dev == nil {
 		return
 	}

@@ -42,3 +42,8 @@ release-notes.md
 .claude/
 # Generated documentation artifacts
 site/
+
+# pi session progress artifacts
+PROGRESS.md
+.progress-log/
+.pi/

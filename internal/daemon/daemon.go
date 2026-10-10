@@ -22,6 +22,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/coreos/go-systemd/v22/activation"
 	sddaemon "github.com/coreos/go-systemd/v22/daemon"
@@ -88,7 +89,10 @@ func Run(ctx context.Context, watchBtn bool) error {
 			}
 			d.mu.Unlock()
 		}()
-		if applyErr := d.applyLightingState(); applyErr != nil {
+		d.mu.Lock()
+		applyErr := d.applyLightingState()
+		d.mu.Unlock()
+		if applyErr != nil {
 			slog.Warn("failed to restore lighting state", "err", applyErr)
 		}
 	}
@@ -96,7 +100,7 @@ func Run(ctx context.Context, watchBtn bool) error {
 	// Avoid a redundant profile write because it briefly stops firmware fan
 	// control, but always restore each independently active override.
 	if !policyManaged && isPhysicalProfile(d.state.Profile) {
-		current, _ := readTrimmed(cli.FindProfilePath())
+		current, _ := cli.ReadTrimmedFile(cli.FindProfilePath())
 		if tuningErr := applyTuning(d.state, current != d.state.Profile); tuningErr != nil {
 			slog.Warn("failed to restore profile tuning", "err", tuningErr)
 		} else {
@@ -216,6 +220,9 @@ func (d *Daemon) broadcast(r response) {
 	d.subMu.Lock()
 	var alive []net.Conn
 	for _, c := range d.subscribers {
+		// A subscriber that stopped reading would otherwise block event
+		// delivery for everyone; drop it when the write cannot complete.
+		_ = c.SetWriteDeadline(time.Now().Add(5 * time.Second))
 		if _, err := c.Write(data); err == nil {
 			alive = append(alive, c)
 		} else {

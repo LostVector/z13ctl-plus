@@ -21,6 +21,7 @@ import (
 	"slices"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -43,6 +44,15 @@ const (
 // 180 = full speed). Order defines UI order.
 var supportedRefreshRates = []int{60, 180}
 
+// refreshCacheTTL bounds how stale a cached refresh-rate read may be.
+const refreshCacheTTL = time.Second
+
+var (
+	refreshCacheMu sync.Mutex
+	refreshCacheHz int
+	refreshCacheAt time.Time
+)
+
 // InternalDisplayState is the current KScreen state for the built-in panel.
 type InternalDisplayState struct {
 	Enabled  bool
@@ -57,13 +67,28 @@ func SupportedRefreshRates() []int {
 }
 
 // ReadRefreshRate returns the current eDP-1 refresh rate in Hz (integer).
-// Returns 0 if kscreen-doctor is missing or eDP-1 is not connected.
+// Returns 0 if kscreen-doctor is missing or eDP-1 is not connected. Results
+// are cached for one second: callers poll this per get-state request and each
+// miss would spawn a kscreen-doctor process.
 func ReadRefreshRate() int {
-	state, err := ReadInternalDisplay()
-	if err != nil || !state.Enabled {
-		return 0
+	refreshCacheMu.Lock()
+	if time.Since(refreshCacheAt) < refreshCacheTTL {
+		hz := refreshCacheHz
+		refreshCacheMu.Unlock()
+		return hz
 	}
-	return state.Refresh
+	refreshCacheMu.Unlock()
+
+	state, err := ReadInternalDisplay()
+
+	refreshCacheMu.Lock()
+	defer refreshCacheMu.Unlock()
+	refreshCacheAt = time.Now()
+	refreshCacheHz = 0
+	if err == nil && state.Enabled {
+		refreshCacheHz = state.Refresh
+	}
+	return refreshCacheHz
 }
 
 // ReadInternalDisplay returns the enabled, mode, scale, and rotation state of eDP-1.

@@ -52,17 +52,25 @@ func SetProfile(profile string) error {
 		return os.WriteFile(primaryPath, []byte(profile+"\n"), 0o644)
 	}
 	var primaryErr error
+	attempted := 0
 	for _, e := range entries {
 		base := dir + "/" + e.Name()
 		p := base + "/profile"
 		if _, err := os.Stat(p); err != nil {
 			continue
 		}
+		attempted++
 		name := profileNameForDevice(base, profile)
 		werr := os.WriteFile(p, []byte(name+"\n"), 0o644)
 		if p == primaryPath {
 			primaryErr = werr
 		}
+	}
+	if attempted == 0 {
+		// The class directory exists but no entry exposes a profile file;
+		// fall back to the ACPI path and surface its result instead of
+		// silently reporting success.
+		return os.WriteFile(primaryPath, []byte(profile+"\n"), 0o644)
 	}
 	if primaryErr == nil {
 		setPPD(profile)

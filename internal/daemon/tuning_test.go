@@ -64,3 +64,29 @@ func TestPlanTuningQuietUsesFirmwareAuto(t *testing.T) {
 		t.Errorf("custom curve did not override quiet default: %+v", plan.Fan)
 	}
 }
+
+func TestPlanTuningHighTDPKeepsStrongUserCurve(t *testing.T) {
+	strong := &api.FanCurveState{Mode: 1, Points: []api.FanCurvePoint{
+		{Temp: 30, PWM: 255}, {Temp: 40, PWM: 255}, {Temp: 50, PWM: 255}, {Temp: 60, PWM: 255},
+		{Temp: 65, PWM: 255}, {Temp: 70, PWM: 255}, {Temp: 75, PWM: 255}, {Temp: 80, PWM: 255},
+	}}
+	weak := &api.FanCurveState{Mode: 1, Points: []api.FanCurvePoint{
+		{Temp: 30, PWM: 100}, {Temp: 40, PWM: 120}, {Temp: 50, PWM: 140}, {Temp: 60, PWM: 160},
+		{Temp: 65, PWM: 180}, {Temp: 70, PWM: 200}, {Temp: 75, PWM: 220}, {Temp: 80, PWM: 240},
+	}}
+	state := api.State{
+		TDP:            &api.TDPState{PL1SPL: cli.TDPMaxSafe + 1},
+		TDPActive:      true,
+		FanCurve:       strong,
+		FanCurveActive: true,
+	}
+
+	if plan := planTuning(state); !cli.FanCurveEquals(plan.Fan.Points, strong.Points) {
+		t.Error("high TDP with an all-255 user curve: the user curve should stand")
+	}
+
+	state.FanCurve = weak
+	if plan := planTuning(state); !cli.FanCurveEquals(plan.Fan.Points, cli.HighTDPFanCurve()) {
+		t.Error("high TDP with a sub-floor user curve: the safety curve should apply")
+	}
+}

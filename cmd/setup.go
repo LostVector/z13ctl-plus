@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"os/user"
 	"path/filepath"
 	"strings"
 
@@ -72,10 +73,10 @@ After=sysinit.target
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-ExecStart=/bin/sh -c 'for f in /sys/class/power_supply/BAT*/charge_control_end_threshold; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done'
-ExecStart=/bin/sh -c 'for f in /sys/class/firmware-attributes/asus-armoury/attributes/boot_sound/current_value /sys/class/firmware-attributes/asus-armoury/attributes/panel_overdrive/current_value; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done'
-ExecStart=/bin/sh -c 'for f in /sys/devices/platform/asus-nb-wmi/ppt_*; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done'
-ExecStart=/bin/sh -c 'for f in /sys/devices/system/cpu/cpufreq/boost /sys/devices/system/cpu/cpufreq/policy*/scaling_min_freq /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done'
+ExecStart=/bin/sh -c 'for f in /sys/class/power_supply/BAT*/charge_control_end_threshold; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done || true'
+ExecStart=/bin/sh -c 'for f in /sys/class/firmware-attributes/asus-armoury/attributes/boot_sound/current_value /sys/class/firmware-attributes/asus-armoury/attributes/panel_overdrive/current_value; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done || true'
+ExecStart=/bin/sh -c 'for f in /sys/devices/platform/asus-nb-wmi/ppt_*; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done || true'
+ExecStart=/bin/sh -c 'for f in /sys/devices/system/cpu/cpufreq/boost /sys/devices/system/cpu/cpufreq/policy*/scaling_min_freq /sys/devices/system/cpu/cpufreq/policy*/energy_performance_preference; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f"; done || true'
 ExecStart=/bin/sh -c 'for f in /sys/kernel/ryzen_smu_drv/smu_args /sys/kernel/ryzen_smu_drv/mp1_smu_cmd /sys/kernel/ryzen_smu_drv/rsmu_cmd; do [ -e "$$f" ] && chgrp %s "$$f" && chmod g+w "$$f" || true; done'
 
 [Install]
@@ -85,15 +86,25 @@ WantedBy=multi-user.target
 
 // applySysfsPerms scans live sysfs for files managed by z13ctl-plus and either
 // applies chgrp/chmod immediately (dryRun=false) or prints what would be done
-// (dryRun=true). Errors are silently skipped for missing/inaccessible paths.
-func applySysfsPerms(group string, dryRun bool) {
+// (dryRun=true). Missing paths are skipped; failures on existing paths are
+// printed and counted, and returned as an error so setup cannot report
+// success while nothing was granted.
+func applySysfsPerms(group string, dryRun bool) error {
+	failures := 0
 	chgrpChmod := func(path, mode string) {
 		if dryRun {
 			fmt.Printf("  chgrp %s %s && chmod %s %s\n", group, path, mode, path)
 			return
 		}
-		_ = exec.Command("chgrp", group, path).Run()
-		_ = exec.Command("chmod", mode, path).Run()
+		if err := exec.Command("chgrp", group, path).Run(); err != nil {
+			failures++
+			fmt.Fprintf(os.Stderr, "  chgrp failed: %s: %v\n", path, err)
+			return
+		}
+		if err := exec.Command("chmod", mode, path).Run(); err != nil {
+			failures++
+			fmt.Fprintf(os.Stderr, "  chmod failed: %s: %v\n", path, err)
+		}
 	}
 	applyMatches := func(pattern, mode string) {
 		matches, _ := filepath.Glob(pattern)
@@ -146,6 +157,10 @@ func applySysfsPerms(group string, dryRun bool) {
 			chgrpChmod("/dev/input/"+filepath.Base(dir), "g+rw")
 		}
 	}
+	if failures > 0 {
+		return fmt.Errorf("%d permission change(s) failed", failures)
+	}
+	return nil
 }
 
 var setupCmd = &cobra.Command{
@@ -191,7 +206,7 @@ This command must be run with sudo (unless --dry-run is used).`,
 				fmt.Println("Would run: systemctl enable --now z13ctl-plus-perms.service")
 			}
 			fmt.Println("\nWould apply sysfs permissions (files present on this system):")
-			applySysfsPerms(setupGroup, true)
+			_ = applySysfsPerms(setupGroup, true)
 			return nil
 		}
 
@@ -199,9 +214,19 @@ This command must be run with sudo (unless --dry-run is used).`,
 			return fmt.Errorf("this command requires root — run with sudo:\n  sudo z13ctl-plus setup\n\nTo preview changes without root: z13ctl-plus --dry-run setup")
 		}
 
+		if _, err := user.LookupGroup(setupGroup); err != nil {
+			return fmt.Errorf("unknown group %q: %w\n  create it first or pass an existing group via --group", setupGroup, err)
+		}
+		if setupGroup == "users" || setupGroup == "wheel" {
+			fmt.Fprintf(os.Stderr, "warning: group %q usually has many members; each one gains write access to power, fan and voltage controls. Consider a dedicated group via --group.\n", setupGroup)
+		}
+
 		// --perms-only: just reapply sysfs permissions, skip rules and service.
 		if permsOnlyFlag {
-			applySysfsPerms(setupGroup, false)
+			if err := applySysfsPerms(setupGroup, false); err != nil {
+				return fmt.Errorf("applying sysfs permissions: %w", err)
+			}
+			fmt.Println("Applied sysfs permissions.")
 			return nil
 		}
 
@@ -231,7 +256,9 @@ This command must be run with sudo (unless --dry-run is used).`,
 		// systemd 259+ does not execute RUN{program} for synthetic udevadm trigger
 		// events, so apply sysfs permissions directly. The udev rules cover
 		// subsequent boots via real kernel ADD events.
-		applySysfsPerms(setupGroup, false)
+		if err := applySysfsPerms(setupGroup, false); err != nil {
+			return fmt.Errorf("applying sysfs permissions: %w", err)
+		}
 		fmt.Println("Applied sysfs permissions.")
 
 		// Install the battery permissions service. charge_control_end_threshold is

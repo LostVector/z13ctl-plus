@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 
@@ -82,7 +83,11 @@ func runStatus() error {
 	}
 	fmt.Printf("Battery: %s%s\n", capStr, limitStr)
 
-	// Live telemetry (CPU/GPU temp+util, clocks, VRAM, mem clock).
+	// Live telemetry (CPU/GPU temp+util, clocks, VRAM, mem clock). CPU
+	// utilisation is a delta since the previous read, so prime the snapshot
+	// and let a short window elapse before sampling.
+	_, _ = cli.ReadCPUUtilization()
+	time.Sleep(200 * time.Millisecond)
 	t := cli.ReadTelemetry()
 	fmt.Println("Telemetry:")
 	fmt.Printf("  CPU:    %d°C, %d%%, %s, %d RPM\n", t.CPUTemp, t.CPUUtil, formatClock(t.CPUClockMHz), t.CPUFanRPM)

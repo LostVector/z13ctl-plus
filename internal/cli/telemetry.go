@@ -24,6 +24,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/dahui/z13ctl/api"
 )
@@ -294,7 +295,14 @@ var (
 	cpuUtilPrev     uint64 // sum of all jiffies (user+nice+system+...+idle+iowait)
 	cpuUtilPrevBusy uint64 // sum of non-idle jiffies
 	cpuUtilHasPrev  bool
+	cpuUtilLast     int       // last accepted percentage
+	cpuUtilLastAt   time.Time // when it was accepted
 )
+
+// cpuUtilMinInterval is the smallest sampling window accepted. Two pollers
+// calling faster than this would otherwise divide a near-zero jiffie delta
+// into noise; they get the last computed value instead.
+const cpuUtilMinInterval = 150 * time.Millisecond
 
 // ReadCPUUtilization returns aggregate CPU utilisation (0–100) across all
 // cores, computed as the busy-jiffie delta over the total-jiffie delta since
@@ -340,21 +348,27 @@ func ReadCPUUtilization() (int, error) {
 		cpuUtilPrev = total
 		cpuUtilPrevBusy = busy
 		cpuUtilHasPrev = true
+		cpuUtilLastAt = time.Now()
 		return 0, nil
+	}
+	if time.Since(cpuUtilLastAt) < cpuUtilMinInterval {
+		return cpuUtilLast, nil // keep the snapshot; the window keeps growing
 	}
 	dt := total - cpuUtilPrev
 	db := busy - cpuUtilPrevBusy
+	if dt == 0 {
+		return cpuUtilLast, nil
+	}
 	cpuUtilPrev = total
 	cpuUtilPrevBusy = busy
-	if dt == 0 {
-		return 0, nil
-	}
+	cpuUtilLastAt = time.Now()
 	pct := int((db * 100) / dt)
 	if pct < 0 {
 		pct = 0
 	} else if pct > 100 {
 		pct = 100
 	}
+	cpuUtilLast = pct
 	return pct, nil
 }
 

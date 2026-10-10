@@ -38,11 +38,11 @@ func readCPUPower(base string) (api.CPUPowerState, error) {
 	if err != nil {
 		return api.CPUPowerState{}, fmt.Errorf("reading CPU frequency upper limit: %w", err)
 	}
-	epp, err := readTrimmed(policy + "/energy_performance_preference")
+	epp, err := ReadTrimmedFile(policy + "/energy_performance_preference")
 	if err != nil {
 		return api.CPUPowerState{}, fmt.Errorf("reading CPU EPP: %w", err)
 	}
-	choices, err := readTrimmed(policy + "/energy_performance_available_preferences")
+	choices, err := ReadTrimmedFile(policy + "/energy_performance_available_preferences")
 	if err != nil {
 		return api.CPUPowerState{}, fmt.Errorf("reading CPU EPP choices: %w", err)
 	}
@@ -94,7 +94,7 @@ func setCPUEPP(base, value string) error {
 	if err != nil {
 		return err
 	}
-	choices, err := readTrimmed(policies[0] + "/energy_performance_available_preferences")
+	choices, err := ReadTrimmedFile(policies[0] + "/energy_performance_available_preferences")
 	if err != nil {
 		return fmt.Errorf("reading CPU EPP choices: %w", err)
 	}
@@ -127,7 +127,9 @@ func cpuPolicies(base string) ([]string, error) {
 	return policies, nil
 }
 
-func readTrimmed(path string) (string, error) {
+// ReadTrimmedFile reads a file and trims surrounding whitespace. Shared by
+// cmd/, internal/cli and internal/daemon (sysfs attribute reads).
+func ReadTrimmedFile(path string) (string, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		return "", err

@@ -29,9 +29,8 @@ func (d *Daemon) seedDefaultPresets(fresh bool) error {
 
 	d.mu.Lock()
 	setDefaultPowerConfiguration(&d.state, cpu.MinLimitKHz)
-	s := d.state
 	d.mu.Unlock()
-	return saveState(s)
+	return d.persistState()
 }
 
 func setDefaultPowerConfiguration(state *api.State, minFrequencyKHz int) {
@@ -100,9 +99,8 @@ func (d *Daemon) restoreRecommended() error {
 	d.mu.Lock()
 	restoreRecommendedPowerConfiguration(&d.state, cpu.MinLimitKHz)
 	d.powerSource = source
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		return err
 	}
 	name := "On Battery"
@@ -164,11 +162,8 @@ func (d *Daemon) savePreset(name string) error {
 	}
 	presets[name] = preset
 	d.state.Presets = presets
-	s := d.state
-	s.Presets = clonePresetMap(d.state.Presets)
-	s.PowerPolicy = clonePtr(d.state.PowerPolicy)
 	d.mu.Unlock()
-	return saveState(s)
+	return d.persistState()
 }
 
 func (d *Daemon) deletePreset(name string) error {
@@ -260,11 +255,8 @@ func (d *Daemon) applyPreset(name string) error {
 		d.state.PanelOverdrive = *preset.PanelOverdrive
 	}
 	d.state.ActivePreset = name
-	s := d.state
-	s.Presets = clonePresetMap(d.state.Presets)
-	s.PowerPolicy = clonePtr(d.state.PowerPolicy)
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		return err
 	}
 	slog.Info("preset applied", "name", name)
@@ -272,7 +264,7 @@ func (d *Daemon) applyPreset(name string) error {
 }
 
 func readOptionalInt(path string) (int, error) {
-	value, err := readTrimmed(path)
+	value, err := cli.ReadTrimmedFile(path)
 	if err != nil {
 		return 0, err
 	}
@@ -421,10 +413,9 @@ func (d *Daemon) setPowerPolicy(enabled bool, acPreset, batteryPreset string) er
 		}
 	}
 	d.state.PowerPolicy = &api.PowerPolicy{Enabled: enabled, ACPreset: acPreset, BatteryPreset: batteryPreset}
-	s := d.state
 	source := d.powerSource
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		return err
 	}
 	if applyNow {
@@ -455,9 +446,8 @@ func (d *Daemon) clearActivePreset() {
 		return
 	}
 	d.state.ActivePreset = ""
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		slog.Warn("failed to clear active preset", "err", err)
 	}
 }

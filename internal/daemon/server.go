@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"maps"
 	"net"
 	"os"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/aic0d3r/z13ctl-plus/internal/aura"
 	"github.com/aic0d3r/z13ctl-plus/internal/cli"
@@ -62,6 +64,9 @@ type response struct {
 // handleConn reads one JSON request, dispatches it, and writes one JSON response.
 // For "subscribe" requests the connection is kept open for event streaming.
 func (d *Daemon) handleConn(conn net.Conn) {
+	// Bound the time a silent or stuck client can hold a connection; the
+	// subscribe path clears the deadline once the handshake completes.
+	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
 	scanner := bufio.NewScanner(conn)
 	if !scanner.Scan() {
 		_ = conn.Close()
@@ -78,6 +83,7 @@ func (d *Daemon) handleConn(conn net.Conn) {
 	if req.Cmd == "subscribe" {
 		// Acknowledge and keep connection open for event streaming.
 		writeResponse(conn, response{OK: true})
+		_ = conn.SetReadDeadline(time.Time{})
 		d.addSubscriber(conn)
 		return
 	}
@@ -176,6 +182,7 @@ func (d *Daemon) dispatch(req request) response {
 		s.TDP = clonePtr(d.state.TDP)
 		s.Undervolt = clonePtr(d.state.Undervolt)
 		s.Presets = clonePresetMap(d.state.Presets)
+		s.Devices = maps.Clone(d.state.Devices)
 		s.PowerPolicy = clonePtr(d.state.PowerPolicy)
 		s.TabletIntegration = clonePtr(d.state.TabletIntegration)
 		d.mu.Unlock()
@@ -373,7 +380,7 @@ func (d *Daemon) handleRefreshRate(req request) response {
 // Reading from sysfs (not daemon state) ensures accurate values even if
 // the profile was changed by another process.
 func handleProfileGet() response {
-	value, err := readTrimmed(cli.FindProfilePath())
+	value, err := cli.ReadTrimmedFile(cli.FindProfilePath())
 	if err != nil {
 		return response{OK: false, Error: "reading profile: " + err.Error()}
 	}
@@ -382,7 +389,7 @@ func handleProfileGet() response {
 
 // handleBatteryLimitGet reads the current battery charge limit from sysfs.
 func handleBatteryLimitGet() response {
-	value, err := readTrimmed(cli.FindBatteryThresholdPath())
+	value, err := cli.ReadTrimmedFile(cli.FindBatteryThresholdPath())
 	if err != nil {
 		return response{OK: false, Error: "reading battery limit: " + err.Error()}
 	}
@@ -526,6 +533,16 @@ func (d *Daemon) handleBrightness(req request) response {
 	if req.Device == "" {
 		d.state.Lighting.Brightness = req.Brightness
 		d.state.Lighting.Enabled = on
+		// Update per-device overrides too; leaving them stale would
+		// resurrect old settings on the next restore.
+		for name, ls := range d.state.Devices {
+			if ls.Mode == "" {
+				ls = d.state.Lighting // pure-off entry: rebuild from the base state
+			}
+			ls.Brightness = req.Brightness
+			ls.Enabled = on
+			d.state.Devices[name] = ls
+		}
 		if err := saveState(d.state); err != nil {
 			slog.Warn("failed to save state", "err", err)
 		}
@@ -535,8 +552,8 @@ func (d *Daemon) handleBrightness(req request) response {
 			d.state.Devices = make(map[string]api.LightingState)
 		}
 		ls := d.state.Lighting // base: fall back to all-device state
-		if existing, ok := d.state.Devices[req.Device]; ok {
-			ls = existing
+		if existing, ok := d.state.Devices[req.Device]; ok && existing.Mode != "" {
+			ls = existing // a pure-off entry (Mode "") is not restorable; use the base
 		}
 		ls.Brightness = req.Brightness
 		ls.Enabled = on
@@ -586,16 +603,15 @@ func (d *Daemon) handleBatteryLimit(req request) response {
 	slog.Info("batterylimit", "set", limit)
 	d.mu.Lock()
 	d.state.Battery = limit
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		slog.Warn("failed to save state", "err", err)
 	}
 	return response{OK: true}
 }
 
 func handleBootSoundGet() response {
-	value, err := readTrimmed(cli.FindBootSoundPath())
+	value, err := cli.ReadTrimmedFile(cli.FindBootSoundPath())
 	if err != nil {
 		return response{OK: false, Error: "reading boot sound: " + err.Error()}
 	}
@@ -615,7 +631,7 @@ func handleBootSound(req request) response {
 }
 
 func handlePanelOverdriveGet() response {
-	value, err := readTrimmed(cli.FindPanelOverdrivePath())
+	value, err := cli.ReadTrimmedFile(cli.FindPanelOverdrivePath())
 	if err != nil {
 		return response{OK: false, Error: "reading panel overdrive: " + err.Error()}
 	}
@@ -634,26 +650,16 @@ func (d *Daemon) handlePanelOverdrive(req request) response {
 	d.mu.Lock()
 	d.state.PanelOverdrive = value
 	d.state.ActivePreset = ""
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		slog.Warn("failed to save state", "err", err)
 	}
 	return response{OK: true}
 }
 
-// readTrimmed reads a file and trims surrounding whitespace.
-func readTrimmed(path string) (string, error) {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(data)), nil
-}
-
 // readIntSysfs parses a sysfs integer, returning 0 on any error.
 func readIntSysfs(path string) int {
-	value, _ := readTrimmed(path)
+	value, _ := cli.ReadTrimmedFile(path)
 	v, _ := strconv.Atoi(value)
 	return v
 }
@@ -697,8 +703,10 @@ func (d *Daemon) handleFanCurve(req request) response {
 	d.mu.Unlock()
 	next.FanCurve = &api.FanCurveState{Mode: 1, Points: points}
 	next.FanCurveActive = true
-	if !planTuning(next).FanSafety {
-		if err := cli.SetBothFanCurves(points); err != nil {
+	if plan := planTuning(next); plan.Fan != nil {
+		// plan.Fan is the user curve when it meets the high-TDP floor,
+		// otherwise the safety curve — write whichever applies.
+		if err := cli.SetBothFanCurves(plan.Fan.Points); err != nil {
 			return response{OK: false, Error: "fancurve: " + err.Error()}
 		}
 	}
@@ -707,9 +715,8 @@ func (d *Daemon) handleFanCurve(req request) response {
 	d.state.FanCurve = &api.FanCurveState{Mode: 1, Points: points}
 	d.state.FanCurveActive = true
 	d.state.ActivePreset = ""
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		slog.Warn("failed to save state", "err", err)
 	}
 	return response{OK: true}
@@ -757,7 +764,7 @@ func handleTDPGet() response {
 
 // readProfileFromSysfs reads the current platform_profile value.
 func readProfileFromSysfs() string {
-	value, _ := readTrimmed(cli.FindProfilePath())
+	value, _ := cli.ReadTrimmedFile(cli.FindProfilePath())
 	return value
 }
 
@@ -789,20 +796,8 @@ func (d *Daemon) handleTDP(req request) response {
 	}
 
 	// PL1 (sustained) requires force flag above 75W. PL2/PL3 (burst) allowed up to hardware max.
-	pl1Max := cli.TDPMaxSafe
-	if req.Force {
-		pl1Max = cli.TDPMaxForced
-	}
-	if pl1 < cli.TDPMin || pl1 > pl1Max {
-		if pl1 > cli.TDPMaxSafe && !req.Force {
-			return response{OK: false, Error: fmt.Sprintf("PL1 %dW exceeds safe sustained max (%dW); use force flag", pl1, cli.TDPMaxSafe)}
-		}
-		return response{OK: false, Error: fmt.Sprintf("PL1 %dW out of range %d–%d", pl1, cli.TDPMin, pl1Max)}
-	}
-	for _, v := range []int{pl2, pl3} {
-		if v < cli.TDPMin || v > cli.TDPMaxForced {
-			return response{OK: false, Error: fmt.Sprintf("TDP %dW out of range %d–%d", v, cli.TDPMin, cli.TDPMaxForced)}
-		}
+	if err := cli.ValidateTDP(pl1, pl2, pl3, req.Force); err != nil {
+		return response{OK: false, Error: err.Error()}
 	}
 
 	d.mu.Lock()
@@ -829,6 +824,13 @@ func (d *Daemon) handleTDP(req request) response {
 				_ = cli.ResetAllFanCurves()
 			}
 		}
+		// Reapply the previous known power state: reading sysfs back would
+		// return the kernel's stale 5 W cache.
+		if old.TDPActive && old.TDP != nil {
+			_ = cli.SetTDP(0, old.TDP.PL1SPL, old.TDP.PL2SPPT, old.TDP.FPPT)
+		} else {
+			_ = cli.SetProfile(readProfileFromSysfs())
+		}
 		return response{OK: false, Error: "tdp: " + err.Error()}
 	}
 	if oldSafety && !plan.FanSafety {
@@ -844,9 +846,8 @@ func (d *Daemon) handleTDP(req request) response {
 	d.state.TDP = clonePtr(next.TDP)
 	d.state.TDPActive = true
 	d.state.ActivePreset = ""
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		slog.Warn("failed to save state", "err", err)
 	}
 	slog.Info("tdp", "pl1", pl1, "pl2", pl2, "pl3", pl3)
@@ -922,9 +923,8 @@ func (d *Daemon) handleUndervolt(req request) response {
 	d.state.Undervolt = &api.UndervoltState{CPUCO: cpuOffset, Active: true}
 	d.state.UndervoltActive = true
 	d.state.ActivePreset = ""
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		slog.Warn("failed to save state", "err", err)
 	}
 	return response{OK: true}
@@ -942,9 +942,8 @@ func (d *Daemon) handleUndervoltReset() response {
 	d.state.Undervolt = nil
 	d.state.UndervoltActive = false
 	d.state.ActivePreset = ""
-	s := d.state
 	d.mu.Unlock()
-	if err := saveState(s); err != nil {
+	if err := d.persistState(); err != nil {
 		slog.Warn("failed to save state", "err", err)
 	}
 	return response{OK: true}

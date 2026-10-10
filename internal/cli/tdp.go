@@ -67,6 +67,28 @@ func ReadAllPPT() (api.TDPState, error) {
 	return s, nil
 }
 
+// ValidateTDP enforces the shared TDP safety rule, used by both the CLI and
+// the daemon: PL1 (sustained) is capped at TDPMaxSafe unless force allows up
+// to TDPMaxForced; PL2/PL3 (burst) may use the hardware max without force.
+func ValidateTDP(pl1, pl2, pl3 int, force bool) error {
+	pl1Max := TDPMaxSafe
+	if force {
+		pl1Max = TDPMaxForced
+	}
+	if pl1 < TDPMin || pl1 > pl1Max {
+		if pl1 > TDPMaxSafe && !force {
+			return fmt.Errorf("PL1 %dW exceeds safe sustained max (%dW); use force to allow up to %dW", pl1, TDPMaxSafe, TDPMaxForced)
+		}
+		return fmt.Errorf("PL1 %dW out of range %d–%d", pl1, TDPMin, pl1Max)
+	}
+	for _, v := range []int{pl2, pl3} {
+		if v < TDPMin || v > TDPMaxForced {
+			return fmt.Errorf("TDP %dW out of range %d–%d", v, TDPMin, TDPMaxForced)
+		}
+	}
+	return nil
+}
+
 // SetTDP writes all PPT values. pl1/pl2/pl3 override the unified watts value
 // when non-zero. APU sPPT and Platform sPPT always follow PL2.
 func SetTDP(watts, pl1, pl2, pl3 int) error {

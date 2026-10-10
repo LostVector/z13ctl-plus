@@ -5,9 +5,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strconv"
-	"strings"
 
 	"github.com/aic0d3r/z13ctl-plus/internal/cli"
 	"github.com/dahui/z13ctl/api"
@@ -93,11 +91,11 @@ func runTdpGet() error {
 }
 
 func readCurrentProfile() string {
-	data, err := os.ReadFile(cli.FindProfilePath())
-	if err != nil {
+	profile, err := cli.ReadTrimmedFile(cli.FindProfilePath())
+	if err != nil || profile == "" {
 		return "unknown"
 	}
-	return strings.TrimSpace(string(data))
+	return profile
 }
 
 func runTdpSet() error {
@@ -113,26 +111,8 @@ func runTdpSet() error {
 
 	// PL1 (sustained) requires --force above 75W. PL2/PL3 (burst) are allowed
 	// up to the hardware max without --force since short bursts are thermally safe.
-	pl1Max := cli.TDPMaxSafe
-	if tdpForceFlag {
-		pl1Max = cli.TDPMaxForced
-	}
-	if pl1 < cli.TDPMin || pl1 > pl1Max {
-		if pl1 > cli.TDPMaxSafe && !tdpForceFlag {
-			return fmt.Errorf("PL1 value %dW exceeds safe sustained maximum (%dW); use --force to allow up to %dW",
-				pl1, cli.TDPMaxSafe, cli.TDPMaxForced)
-		}
-		return fmt.Errorf("PL1 value %dW out of range %d–%d", pl1, cli.TDPMin, pl1Max)
-	}
-	for _, v := range []struct {
-		name  string
-		value int
-	}{
-		{"PL2", pl2}, {"PL3", pl3},
-	} {
-		if v.value < cli.TDPMin || v.value > cli.TDPMaxForced {
-			return fmt.Errorf("%s value %dW out of range %d–%d", v.name, v.value, cli.TDPMin, cli.TDPMaxForced)
-		}
+	if err := cli.ValidateTDP(pl1, pl2, pl3, tdpForceFlag); err != nil {
+		return err
 	}
 
 	if dryRunFlag {
@@ -159,6 +139,12 @@ func runTdpSet() error {
 
 	if err := cli.SetTDP(watts, pl1, pl2, pl3); err != nil {
 		return fmt.Errorf("setting TDP: %w\n  (run 'sudo z13ctl-plus setup' to enable non-root access)", err)
+	}
+	// The daemonless path keeps no record of the desired curve: when
+	// returning to a safe sustained limit, lift a previously forced safety
+	// curve back to firmware auto control.
+	if pl1 <= cli.TDPMaxSafe {
+		cli.LiftHighTDPFanCurve()
 	}
 	fmt.Printf("TDP set to %dW\n", watts)
 	return nil

@@ -214,8 +214,11 @@ func TestDryRunTdp(t *testing.T) {
 func TestDryRunTdp_Force(t *testing.T) {
 	out := captureStdout(t, func() { cli.DryRunTdp(80, 0, 0, 0, true) })
 
-	if !strings.Contains(out, "full speed") {
-		t.Error("DryRunTdp(80W, force) should mention full speed")
+	if !strings.Contains(out, "safety curve") {
+		t.Error("DryRunTdp(80W, force) should mention the safety curve")
+	}
+	if strings.Contains(out, "full speed") {
+		t.Error("DryRunTdp(80W, force) must not claim full speed; the real code sets a custom 80%+ curve")
 	}
 }
 
@@ -238,12 +241,15 @@ func TestDryRunTdpReset(t *testing.T) {
 
 	for _, want := range []string{
 		"DRY RUN",
-		"fan curves",
-		"balanced",
+		"profile",
+		"PPT",
 	} {
 		if !strings.Contains(out, want) {
 			t.Errorf("DryRunTdpReset output missing %q", want)
 		}
+	}
+	if strings.Contains(out, "balanced") {
+		t.Error("DryRunTdpReset must not claim a switch to balanced; the real reset re-applies the current profile")
 	}
 }
 

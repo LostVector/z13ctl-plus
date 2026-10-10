@@ -189,6 +189,37 @@ func HighTDPFanCurve() []api.FanCurvePoint {
 	}
 }
 
+// FanCurveEquals reports whether two fan curves have identical points.
+func FanCurveEquals(a, b []api.FanCurvePoint) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// LiftHighTDPFanCurve resets both fans to firmware auto mode if the current
+// custom curve is exactly the high-TDP safety curve. Used by the daemonless
+// CLI path, which keeps no record of the user's desired curve.
+func LiftHighTDPFanCurve() {
+	modes, modeErr := ReadBothFanModes()
+	curves, curveErr := ReadBothFanCurves()
+	if modeErr != nil || curveErr != nil {
+		return
+	}
+	safety := HighTDPFanCurve()
+	for i := range fanIndices {
+		if modes[i] != 1 || !FanCurveEquals(curves[i], safety) {
+			return
+		}
+	}
+	_ = ResetAllFanCurves()
+}
+
 // ParseFanCurve parses a fan curve string "temp:pwm,temp:pwm,..." into a
 // slice of FanCurvePoint. Requires exactly 8 points. Temps must be
 // monotonically increasing (0–120°C). PWM values must be monotonically

@@ -159,8 +159,8 @@ func DryRunTdp(watts, pl1, pl2, pl3 int, force bool) {
 	if pl3 == 0 {
 		pl3 = watts
 	}
-	if force && (pl1 > TDPMaxSafe || pl2 > TDPMaxSafe || pl3 > TDPMaxSafe) {
-		fmt.Println("Would set all fans to full speed (pwm_enable=0) for thermal safety")
+	if force && pl1 > TDPMaxSafe {
+		fmt.Println("Would set both fans to the 80%+ safety curve (pwm_enable=1, custom mode) for thermal safety")
 	}
 	base := pptBasePath
 	fmt.Printf("Would write %d to %s/ppt_pl1_spl\n", pl1, base)
@@ -173,8 +173,12 @@ func DryRunTdp(watts, pl1, pl2, pl3 int, force bool) {
 // DryRunTdpReset prints the actions for a TDP reset.
 func DryRunTdpReset() {
 	fmt.Println("=== DRY RUN (no sysfs write) ===")
-	fmt.Println("Would reset fan curves to auto mode")
-	fmt.Println("Would switch profile to balanced (firmware sets per-profile PPT and fan curves)")
+	profile := "unknown"
+	if p, err := ReadTrimmedFile(FindProfilePath()); err == nil && p != "" {
+		profile = p
+	}
+	fmt.Printf("Would re-apply the current physical profile (%s) to restore its firmware PPT defaults\n", profile)
+	fmt.Println("Fans keep their current mode (an active custom fan curve stays active)")
 }
 
 // DryRunUndervolt prints the SMU commands that would be sent for a Curve Optimizer change.

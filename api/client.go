@@ -80,6 +80,9 @@ func sendCommand(req request) (bool, *response, error) {
 		return false, nil, nil // daemon not running
 	}
 	defer func() { _ = conn.Close() }()
+	// Bound the whole exchange: a daemon stuck on a hardware write must not
+	// hang the caller forever.
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
 
 	data, err := json.Marshal(req)
 	if err != nil {
@@ -377,6 +380,7 @@ func Subscribe(events []string) (<-chan string, func(), error) {
 	if err != nil {
 		return nil, nil, nil // daemon not running
 	}
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second)) // handshake only
 
 	req := request{Cmd: "subscribe", Events: events}
 	data, err := json.Marshal(req)
@@ -404,6 +408,8 @@ func Subscribe(events []string) (<-chan string, func(), error) {
 		_ = conn.Close()
 		return nil, nil, fmt.Errorf("subscribe: %s", ack.Error)
 	}
+	// Long-lived connection: clear the handshake deadline.
+	_ = conn.SetDeadline(time.Time{})
 
 	ch := make(chan string, 8)
 	go func() {

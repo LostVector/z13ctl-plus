@@ -29,7 +29,7 @@ func ReadBatteryState() (*api.BatteryState, error) {
 	}
 	batPath := matches[0]
 	capacity, _ := readIntFile(batPath + "/capacity")
-	status, _ := readTrimmed(batPath + "/status")
+	status, _ := ReadTrimmedFile(batPath + "/status")
 	threshold := readIntSafe(batPath + "/charge_control_end_threshold")
 	powerMicroW := readIntSafe(batPath + "/power_now")
 	voltageMicroV := readIntSafe(batPath + "/voltage_now")

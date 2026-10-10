@@ -118,7 +118,7 @@ func (d *Daemon) reconcileDisplay() (changed, retry bool, err error) {
 	d.displayMu.Lock()
 	intent := d.display
 	d.displayMu.Unlock()
-	if intent.posture == "" {
+	if intent.posture == "" && intent.refresh == 0 {
 		return false, false, nil
 	}
 	if time.Now().Before(intent.notBefore) {
@@ -144,6 +144,9 @@ func (d *Daemon) reconcileDisplay() (changed, retry bool, err error) {
 	case "tablet":
 		scale = 1.75
 		rotation = intent.rotation
+	default:
+		// No posture reported (tablet kit absent): scale and rotation are not
+		// ours to set, but refresh intents still apply.
 	}
 	refresh := intent.refresh
 	if scale != 0 && math.Abs(current.Scale-scale) < 0.01 {

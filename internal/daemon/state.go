@@ -212,6 +212,15 @@ func saveState(s api.State) error {
 	return os.Rename(tmp, path)
 }
 
+// persistState saves the live state while holding d.mu, so a concurrent
+// mutation cannot slip in between the marshal and the disk write (lost
+// update). Callers must not hold d.mu.
+func (d *Daemon) persistState() error {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	return saveState(d.state)
+}
+
 func projectTabletSettings(settings api.TabletSettings) error {
 	path := api.TabletSettingsPath()
 	if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {

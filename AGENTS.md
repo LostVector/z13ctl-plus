@@ -84,7 +84,6 @@ internal/
     display.go               serialized/coalescing internal-panel display coordinator
     server.go                JSON request handler; handleConn(), dispatch(), command handlers
     resume.go                DBus logind PrepareForSleep watcher; turns off lightbar on sleep, restores lighting + volatile state on resume
-    client.go                Redirect comment only — client functions live in api/
   hid/
     hid.go                   package doc file only
     device.go                Device type, Write, Descriptions, Close
