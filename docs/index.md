@@ -1,7 +1,10 @@
 # z13ctl-plus
 
-Power automation, composable tuning overrides, AMD P-State policy, coordinated
-display state, and expanded telemetry for the **2025 ASUS ROG Flow Z13** on Linux.
+Linux control for the **2025 ASUS ROG Flow Z13** (GZ302): RGB keyboard and
+lightbar lighting, custom fan curves, TDP/PPT power limits, CPU undervolting
+via Curve Optimizer, battery charge limiting — plus power automation,
+composable tuning overrides, AMD P-State policy, coordinated display state,
+and expanded telemetry, through one CLI and a systemd user daemon.
 
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](https://github.com/aic0d3r/z13ctl-plus/blob/main/LICENSE)
 

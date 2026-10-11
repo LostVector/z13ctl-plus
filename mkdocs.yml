@@ -1,6 +1,7 @@
 site_name: z13ctl-plus
 site_url: https://aic0d3r.github.io/z13ctl-plus
-site_description: Independently named dahui/z13ctl-compatible fork with power automation, composable tuning, coordinated display state, and expanded telemetry.
+site_description: "Linux control for the 2025 ASUS ROG Flow Z13: RGB keyboard and lightbar lighting, fan curves, TDP power limits, CPU undervolt (Curve Optimizer), battery charge limit, presets, and tablet posture — CLI and systemd daemon. Compatible fork of dahui/z13ctl."
+site_author: aic0d3r
 
 repo_url: https://github.com/aic0d3r/z13ctl-plus
 repo_name: aic0d3r/z13ctl-plus
