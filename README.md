@@ -21,6 +21,15 @@ API import remains `github.com/dahui/z13ctl/api`; external Plus clients such as
 Z13GUI+ must select the matching fork API source with a replacement because
 upstream API source targets the upstream socket.
 
+## Contents
+
+- [What Plus Adds](#what-plus-adds)
+- [Tablet stack](#tablet-stack)
+- [Install](#install)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+- [License](#license)
+
 ## What Plus Adds
 
 - **Whole-system power automation** — capture named presets and assign separate
