@@ -1,8 +1,19 @@
 # z13ctl+ — RGB, fan curves, TDP & undervolt control for the ASUS ROG Flow Z13
 
+<div align="center">
+
 [![Release](https://img.shields.io/github/v/release/aic0d3r/z13ctl-plus)](https://github.com/aic0d3r/z13ctl-plus/releases)
 [![AUR](https://img.shields.io/aur/version/z13ctl-plus-bin)](https://aur.archlinux.org/packages/z13ctl-plus-bin)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
+
+[What Plus Adds](#what-plus-adds) •
+[Tablet stack](#tablet-stack) •
+[Install](#install) •
+[Quick Start](#quick-start) •
+[Documentation](#documentation) •
+[License](#license)
+
+</div>
 
 Linux control for the **2025 ASUS ROG Flow Z13** (GZ302): RGB keyboard and
 lightbar lighting, custom fan curves, TDP/PPT power limits, CPU undervolting
@@ -20,15 +31,6 @@ The root Go module is `github.com/aic0d3r/z13ctl-plus`. The separate compatible
 API import remains `github.com/dahui/z13ctl/api`; external Plus clients such as
 Z13GUI+ must select the matching fork API source with a replacement because
 upstream API source targets the upstream socket.
-
-## Contents
-
-- [What Plus Adds](#what-plus-adds)
-- [Tablet stack](#tablet-stack)
-- [Install](#install)
-- [Quick Start](#quick-start)
-- [Documentation](#documentation)
-- [License](#license)
 
 ## What Plus Adds
 
