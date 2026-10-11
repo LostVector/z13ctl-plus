@@ -21,16 +21,12 @@ via Curve Optimizer, battery charge limiting, boot sound and panel overdrive,
 plus power automation, AMD P-State policy, coordinated display state, and
 telemetry — through one CLI and a systemd user daemon.
 
-`z13ctl-plus` is an independently named compatible fork of
-[`dahui/z13ctl`](https://github.com/dahui/z13ctl). It preserves intentional Go
-API and daemon wire compatibility while using its own command, services, socket,
-state, packages, and udev namespace. It can be installed alongside upstream;
-enable only one project's hardware daemon at a time.
-
-The root Go module is `github.com/aic0d3r/z13ctl-plus`. The separate compatible
-API import remains `github.com/dahui/z13ctl/api`; external Plus clients such as
-Z13GUI+ must select the matching fork API source with a replacement because
-upstream API source targets the upstream socket.
+`z13ctl-plus` is an independently named fork of
+[`dahui/z13ctl`](https://github.com/dahui/z13ctl) with its own command, socket,
+state, and packages, so it installs alongside upstream — enable only one
+project's hardware daemon at a time. The daemon protocol and Go API stay
+compatible; client integration details are in the
+[API documentation](https://aic0d3r.github.io/z13ctl-plus/api/).
 
 ## What Plus Adds
 
