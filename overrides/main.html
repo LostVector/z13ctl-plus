@@ -1,0 +1,13 @@
+{# Homepage title tag: keyword-complete for search engines; site_name alone
+   ("z13ctl-plus") carries no keywords. Subpages keep the default
+   "<page> - <site>" pattern via super(). Extends the theme's main.html
+   (itself just "extends base.html"), so base.html is not shadowed. #}
+{% extends "base.html" %}
+
+{% block htmltitle %}
+  {% if page.is_homepage %}
+    <title>z13ctl-plus — ASUS ROG Flow Z13 Linux control: RGB, fans, TDP, undervolt</title>
+  {% else %}
+    {{ super() }}
+  {% endif %}
+{% endblock %}

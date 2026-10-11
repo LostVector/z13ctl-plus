@@ -1,4 +1,4 @@
-# z13ctl-plus
+# z13ctl-plus — RGB, fan curves, TDP & undervolt control for the ASUS ROG Flow Z13 on Linux
 
 Linux control for the **2025 ASUS ROG Flow Z13** (GZ302): RGB keyboard and
 lightbar lighting, custom fan curves, TDP/PPT power limits, CPU undervolting

@@ -1,4 +1,4 @@
-# z13ctl+
+# z13ctl+ — RGB, fan curves, TDP & undervolt control for the ASUS ROG Flow Z13
 
 [![Release](https://img.shields.io/github/v/release/aic0d3r/z13ctl-plus)](https://github.com/aic0d3r/z13ctl-plus/releases)
 [![AUR](https://img.shields.io/aur/version/z13ctl-plus-bin)](https://aur.archlinux.org/packages/z13ctl-plus-bin)
