@@ -35,6 +35,8 @@ go.work.sum
 
 # Release notes staged for git tag annotation (passed via `git tag -a -F`)
 release-notes.md
+# Local audit/working docs (kept out of the repo; see CHANGELOG.md)
+AUDIT.md
 
 # Editor/IDE
 # .idea/
